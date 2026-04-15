@@ -10,6 +10,52 @@ python scripts/prepare_selected_dataset.py
 
 This randomly selects 25 items (seed `42`) from `TDD_Bench.json` and writes them to `TDD_Bench_selected.json`. Use `-N` to change the number of items and `--seed` to change the random seed.
 
+## Generating Predictions
+
+Use `scripts/generate_predictions.py` to run Copilot CLI inside Docker containers and generate test predictions:
+
+```bash
+python scripts/generate_predictions.py \
+    --benchmark TDD_Bench_selected.json \
+    --variant variants/basic.yaml
+```
+
+This will:
+1. Build Docker images for each instance (reuses the existing harness)
+2. Start a container per instance with the repo at the correct commit
+3. Install and run Copilot CLI with the variant's prompt and model
+4. Capture `git diff` as the prediction
+5. Write results incrementally to `copilot/<variant_name>.json`
+
+**Options:**
+- `--max_workers N` — parallel instances (default: 1)
+- `--timeout N` — per-instance timeout in seconds (default: 1800)
+
+**Prerequisites:** Docker, a GitHub token with Copilot access (`GH_TOKEN` env var or `gh auth login`).
+
+**Resume:** Re-running the same command skips already-completed instances.
+
+**Evaluation:** Run the generated predictions through the evaluation harness:
+```bash
+python -m tddbench.harness.run_evaluation \
+    --predictions_path copilot/basic.json \
+    --max_workers 4 \
+    --run_id copilot-basic
+```
+
+## Variants
+
+Variant YAML files in `variants/` define the model and prompt template:
+
+```yaml
+model_name: claude-sonnet-4-20250514
+prompt: |
+  Your prompt here...
+  {problem_statement}
+```
+
+The `{problem_statement}` placeholder is replaced with the instance's issue description.
+
 # Original README
 
 TDD-Bench-Verified is a new benchmark for generating test cases for test-driven development (TDD). Test-driven development, or TDD, is the practice of "test first, write code later", where a software developer writes tests before writing corresponding code. This means the tests initially fail, and, if everything goes right, they pass after applying the code changes. Compared to the common practice of "write first, test later", TDD makes requirements clearer, enhances confidence in the code once written, and leads to tests that emphasize the interface over implementation details.
