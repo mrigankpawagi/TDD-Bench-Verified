@@ -1,3 +1,22 @@
+# Scripts
+
+## `scripts/prepare_selected_dataset.py`
+
+Randomly selects items from `TDD_Bench.json` and writes them to `TDD_Bench_selected.json`.
+
+```bash
+# Select 25 items (default)
+python scripts/prepare_selected_dataset.py
+
+# Select a custom number of items
+python scripts/prepare_selected_dataset.py -N 50
+
+# Use a different random seed
+python scripts/prepare_selected_dataset.py --seed 123
+```
+
+Uses seed `42` by default for reproducibility.
+
 # Original README
 
 TDD-Bench-Verified is a new benchmark for generating test cases for test-driven development (TDD). Test-driven development, or TDD, is the practice of "test first, write code later", where a software developer writes tests before writing corresponding code. This means the tests initially fail, and, if everything goes right, they pass after applying the code changes. Compared to the common practice of "write first, test later", TDD makes requirements clearer, enhances confidence in the code once written, and leads to tests that emphasize the interface over implementation details.
