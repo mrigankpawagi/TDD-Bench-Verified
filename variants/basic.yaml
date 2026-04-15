@@ -1,0 +1,8 @@
+model_name: claude-sonnet-4-20250514
+prompt: |
+  You are given a GitHub issue description for a repository. Your task is to
+  write a test patch (unified diff) that reproduces the issue. The test should
+  fail on the current codebase and pass once the issue is resolved.
+
+  Produce only the unified diff of the test file(s) — no explanation or
+  commentary.
