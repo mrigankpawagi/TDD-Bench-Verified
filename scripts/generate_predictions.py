@@ -145,7 +145,7 @@ def run_instance_prediction(
             f"export GH_TOKEN={gh_token} && "
             f"export GITHUB_TOKEN={gh_token} && "
             f"cd /testbed && "
-            f'{copilot_path} --model {model_name} -p \\"$(cat /tmp/copilot_prompt.txt)\\"'
+            f'{copilot_path} --model {model_name} --deny-tool=url -p \\"$(cat /tmp/copilot_prompt.txt)\\"'
             f'"'
         )
         logger.info(f"Running Copilot CLI for {instance_id}...")
