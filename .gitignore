@@ -1,6 +1,5 @@
 TDD_Bench.json
 TDD_Bench_selected.json
-copilot/
 logs
 tddbench.egg-info
 *__pycache__/
