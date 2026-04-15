@@ -505,6 +505,18 @@ def build_container(
     build_instance_image(test_spec, client, logger, nocache)
 
     container = None
+    container_name = test_spec.get_instance_container_name(run_id)
+
+    # Remove stale containers from interrupted prior runs so we can safely reuse the name.
+    try:
+        stale_container = client.containers.get(container_name)
+        logger.warning(
+            f"Found existing container with name {container_name}; removing before recreate."
+        )
+        cleanup_container(client, stale_container, logger)
+    except docker.errors.NotFound:
+        pass
+
     try:
         # Get configurations for how container should be created
         config = MAP_REPO_VERSION_TO_SPECS[test_spec.repo][test_spec.version]
@@ -515,7 +527,7 @@ def build_container(
         logger.info(f"Creating container for {test_spec.instance_id}...")
         container = client.containers.create(
             image=test_spec.instance_image_key,
-            name=test_spec.get_instance_container_name(run_id),
+            name=container_name,
             user=user,
             detach=True,
             command="tail -f /dev/null",
