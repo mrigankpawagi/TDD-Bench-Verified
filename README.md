@@ -1,5 +1,7 @@
 # GitHub Copilot on TDD-Bench
 
+Evaluating GitHub Copilot on TDD-Bench-Verified: generating reproduction tests for GitHub issues using AI coding agents.
+
 ## Additional Setup
 
 After following the setup instructions below, prepare a selected subset of the dataset for evaluation:
