@@ -8,5 +8,9 @@ prompt: |
   verify it fails by running it. Iterate until you have a failing test that
   accurately reproduces the issue.
 
-  Issue description:
+  * Do not try to fix the issue.
+  * Do not try to commit or push the changes you make.
+
+  # Issue description:
+  
   {problem_statement}
