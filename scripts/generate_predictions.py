@@ -136,7 +136,7 @@ def run_instance_prediction(
             [
                 "/bin/bash", "-c",
                 f"cd /testbed && GH_TOKEN={gh_token} GITHUB_TOKEN={gh_token} "
-                f"{copilot_path} --model {model_name} --deny-tool=url -p {json.dumps(prompt)}",
+                f"{copilot_path} --model {model_name} --yolo --deny-tool=url -p {json.dumps(prompt)}",
             ],
             timeout=timeout,
         )
