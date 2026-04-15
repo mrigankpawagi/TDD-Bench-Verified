@@ -58,6 +58,16 @@ prompt: |
 
 The `{problem_statement}` placeholder is replaced with the instance's issue description.
 
+## Results
+
+Results on the selected-25 problems (default selection with `N=25`, `seed=42`):
+
+| Approach | Resolved (Full) | Resolved (Partial) | TDD Score |
+|----------|-----------------|---------------------|-----------|
+| Otter (GPT-4o) | | | |
+| Otter++ (GPT-4o) | | | |
+| Copilot Basic | | | |
+
 # Original README
 
 TDD-Bench-Verified is a new benchmark for generating test cases for test-driven development (TDD). Test-driven development, or TDD, is the practice of "test first, write code later", where a software developer writes tests before writing corresponding code. This means the tests initially fail, and, if everything goes right, they pass after applying the code changes. Compared to the common practice of "write first, test later", TDD makes requirements clearer, enhances confidence in the code once written, and leads to tests that emphasize the interface over implementation details.
