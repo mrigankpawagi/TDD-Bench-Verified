@@ -26,7 +26,6 @@ from tddbench.harness.docker_build import (
 from tddbench.harness.docker_utils import (
     cleanup_container,
     exec_run_with_timeout,
-    write_to_container,
 )
 from tddbench.harness.test_spec import make_test_spec
 
@@ -103,25 +102,18 @@ def run_instance_prediction(
         container.start()
         logger.info(f"Container for {instance_id} started: {container.id}")
 
-        # Set up GH_TOKEN inside the container
-        container.exec_run(
-            f'/bin/bash -c "echo \'export GH_TOKEN={gh_token}\nexport GITHUB_TOKEN={gh_token}\' > /etc/profile.d/gh_token.sh"',
-            user="root",
-        )
-        logger.info("GH_TOKEN configured in container")
-
-        # Install Copilot CLI as root (ensures /usr/local/bin placement)
+        # Install Copilot CLI
         logger.info("Installing Copilot CLI...")
         install_output, timed_out, _ = exec_run_with_timeout(
             container,
-            f'/bin/bash -c "export GH_TOKEN={gh_token} && {COPILOT_INSTALL_CMD}"',
+            f'/bin/bash -c "GH_TOKEN={gh_token} {COPILOT_INSTALL_CMD}"',
             timeout=300,
         )
         if timed_out:
             raise RuntimeError("Copilot CLI installation timed out")
         logger.info(f"Copilot CLI install output:\n{install_output[-500:]}")
 
-        # Verify copilot is installed — find the binary
+        # Find the copilot binary
         which_result = container.exec_run(
             '/bin/bash -c "which copilot || find / -name copilot -type f 2>/dev/null | head -5"',
             user="root",
@@ -131,26 +123,22 @@ def run_instance_prediction(
             raise RuntimeError("Copilot CLI binary not found after installation")
         logger.info(f"Copilot binary at: {copilot_path}")
 
-        # Write prompt to a file in the container (avoids shell escaping issues)
+        # Interpolate prompt
         prompt_template = variant["prompt"]
         prompt = prompt_template.format(
             problem_statement=instance.get("problem_statement", ""),
         )
-        write_to_container(container, prompt, Path("/tmp/copilot_prompt.txt"))
-        logger.info("Prompt written to /tmp/copilot_prompt.txt")
 
-        # Run Copilot CLI with prompt from file
-        copilot_cmd = (
-            f'/bin/bash -c "'
-            f"export GH_TOKEN={gh_token} && "
-            f"export GITHUB_TOKEN={gh_token} && "
-            f"cd /testbed && "
-            f'{copilot_path} --model {model_name} --deny-tool=url -p \\"$(cat /tmp/copilot_prompt.txt)\\"'
-            f'"'
-        )
+        # Run Copilot CLI
         logger.info(f"Running Copilot CLI for {instance_id}...")
         copilot_output, timed_out, runtime = exec_run_with_timeout(
-            container, copilot_cmd, timeout=timeout
+            container,
+            [
+                "/bin/bash", "-c",
+                f"cd /testbed && GH_TOKEN={gh_token} GITHUB_TOKEN={gh_token} "
+                f"{copilot_path} --model {model_name} --deny-tool=url -p {json.dumps(prompt)}",
+            ],
+            timeout=timeout,
         )
         logger.info(f"Copilot runtime: {runtime:.2f}s, timed_out: {timed_out}")
         logger.info(f"Copilot output:\n{copilot_output[-2000:]}")
