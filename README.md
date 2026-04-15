@@ -1,21 +1,14 @@
-# Scripts
+# GitHub Copilot on TDD-Bench
 
-## `scripts/prepare_selected_dataset.py`
+## Additional Setup
 
-Randomly selects items from `TDD_Bench.json` and writes them to `TDD_Bench_selected.json`.
+After following the setup instructions below, prepare a selected subset of the dataset for evaluation:
 
 ```bash
-# Select 25 items (default)
 python scripts/prepare_selected_dataset.py
-
-# Select a custom number of items
-python scripts/prepare_selected_dataset.py -N 50
-
-# Use a different random seed
-python scripts/prepare_selected_dataset.py --seed 123
 ```
 
-Uses seed `42` by default for reproducibility.
+This randomly selects 25 items (seed `42`) from `TDD_Bench.json` and writes them to `TDD_Bench_selected.json`. Use `-N` to change the number of items and `--seed` to change the random seed.
 
 # Original README
 
