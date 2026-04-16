@@ -148,12 +148,21 @@ def run_instance_prediction(
         container.exec_run("mkdir -p /tmp", workdir="/testbed")
         container.put_archive("/tmp", _make_tar("prompt.txt", prompt_bytes))
 
+        # Activate the conda environment so Copilot's shell commands can use
+        # pytest and other project dependencies that are installed there.
+        container.exec_run(
+            ["/bin/bash", "-c",
+             'echo "source /opt/miniconda3/bin/activate && conda activate testbed" >> ~/.bashrc'],
+            workdir="/testbed",
+        )
+
         # Run Copilot CLI
         logger.info(f"Running Copilot CLI for {instance_id}...")
         copilot_output, timed_out, runtime = exec_run_with_timeout(
             container,
             [
                 "/bin/bash", "-c",
+                f'source /opt/miniconda3/bin/activate && conda activate testbed && '
                 f'cd /testbed && GH_TOKEN={gh_token} GITHUB_TOKEN={gh_token} '
                 f'{copilot_path} --model {model_name} --yolo --deny-tool=url -p "$(cat /tmp/prompt.txt)"',
             ],
