@@ -62,11 +62,16 @@ The `{problem_statement}` placeholder is replaced with the instance's issue desc
 
 Results on the selected-25 problems (default selection with `N=25`, `seed=42`):
 
-| Approach | Resolved | TDD Score |
-|----------|----------|-----------|
-| Otter (GPT-4o) | 13 | 45.34% |
-| Otter++ (GPT-4o) | 13 | 45.34% |
-| Copilot Basic | 11 | 41.22% |
+| Approach | Resolved | Coverage | TDD Score |
+|----------|----------|----------|-----------|
+| Otter (GPT-4o) | 13 | 66.17% | 45.34% |
+| Otter++ (GPT-4o) | 13 | 67.91% | 45.34% |
+| Copilot Basic | 11 | 69.71% | 41.22% |
+| Copilot Plus | 11 | 67.98% | 39.04% |
+
+- **Resolved**: number of instances where the generated tests fail before the fix and pass after (out of 25).
+- **Coverage**: average fraction of the fix's changed lines exercised by the generated tests.
+- **TDD Score**: average of `coverage × fail_before × pass_after` across all instances.
 
 # Original README
 
