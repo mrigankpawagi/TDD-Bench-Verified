@@ -179,7 +179,7 @@ def run_instance_prediction(
         base_commit = instance["base_commit"]
         container.exec_run("git add -N .", workdir="/testbed")
         git_diff = container.exec_run(
-            f"git diff {base_commit} -- '**/test*.py' '**/test*/**'",
+            f"git diff {base_commit} -- ':(glob)**/test*.py' ':(glob)**/test*/**'",
             workdir="/testbed",
         ).output.decode("utf-8").strip()
         logger.info(f"Git diff ({len(git_diff)} chars):\n{git_diff[:2000]}")
