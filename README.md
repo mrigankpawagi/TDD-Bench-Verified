@@ -64,9 +64,9 @@ Results on the selected-25 problems (default selection with `N=25`, `seed=42`):
 
 | Approach | Resolved | TDD Score |
 |----------|----------|-----------|
-| Otter (GPT-4o) | 13 | 0.4534 |
-| Otter++ (GPT-4o) | 13 | 0.4534 |
-| Copilot Basic | 11 | 0.4122 |
+| Otter (GPT-4o) | 13 | 45.34% |
+| Otter++ (GPT-4o) | 13 | 45.34% |
+| Copilot Basic | 11 | 41.22% |
 
 # Original README
 
