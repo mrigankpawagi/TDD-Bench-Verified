@@ -29,11 +29,13 @@ prompt: |
 
   2b. You MUST run the added or modified tests, and possibly other related tests.
 
-      * Check that the tests fail.
-      * Check that the test does not fail due to an error in the test setup or
-        an error in the test itself.
-      * Check that the test fails specifically because of the issue described 
-        in the problem statement.  
+      * The tests MUST fail. Never submit a passing test.
+      * When writing assertions, consider focusing on what should NOT happen
+        rather than what should happen.
+      * The tests MUST not fail due to an error in the test setup or an error
+        in the test itself.
+      * The tests MUST fail specifically because of the issue described in the
+        problem statement.  
       
       Keep modifying the tests until the above conditions are satisfied and you
       have a failing test that accurately reproduces the issue. Ensure that the
