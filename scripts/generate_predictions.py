@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
+import tarfile
 import tempfile
 import threading
 import traceback
@@ -31,6 +33,17 @@ from tddbench.harness.test_spec import make_test_spec
 
 COPILOT_INSTALL_CMD = "curl -fsSL https://gh.io/copilot-install | bash"
 COPILOT_BIN = "/usr/local/bin/copilot"
+
+
+def _make_tar(name: str, data: bytes) -> bytes:
+    """Create an in-memory tar archive containing a single file."""
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as tar:
+        info = tarfile.TarInfo(name=name)
+        info.size = len(data)
+        tar.addfile(info, io.BytesIO(data))
+    buf.seek(0)
+    return buf.read()
 
 
 def load_variant(variant_path: str) -> dict:
@@ -129,14 +142,20 @@ def run_instance_prediction(
             problem_statement=instance.get("problem_statement", ""),
         )
 
+        # Write prompt to a file inside the container to avoid bash quoting issues
+        # (problem statements often contain backticks, $(), >, etc.)
+        prompt_bytes = prompt.encode("utf-8")
+        container.exec_run("mkdir -p /tmp", workdir="/testbed")
+        container.put_archive("/tmp", _make_tar("prompt.txt", prompt_bytes))
+
         # Run Copilot CLI
         logger.info(f"Running Copilot CLI for {instance_id}...")
         copilot_output, timed_out, runtime = exec_run_with_timeout(
             container,
             [
                 "/bin/bash", "-c",
-                f"cd /testbed && GH_TOKEN={gh_token} GITHUB_TOKEN={gh_token} "
-                f"{copilot_path} --model {model_name} --yolo --deny-tool=url -p {json.dumps(prompt)}",
+                f'cd /testbed && GH_TOKEN={gh_token} GITHUB_TOKEN={gh_token} '
+                f'{copilot_path} --model {model_name} --yolo --deny-tool=url -p "$(cat /tmp/prompt.txt)"',
             ],
             timeout=timeout,
         )
@@ -147,11 +166,12 @@ def run_instance_prediction(
             logger.warning(f"Copilot timed out for {instance_id}")
 
         # Capture git diff against base commit
-        # Only include test files (test*.py) to filter out junk diffs
+        # Include test files: test*.py, tests.py, and anything under tests/ directories
         base_commit = instance["base_commit"]
         container.exec_run("git add -N .", workdir="/testbed")
         git_diff = container.exec_run(
-            f"git diff {base_commit} -- '**/test*.py'", workdir="/testbed"
+            f"git diff {base_commit} -- '**/test*.py' '**/tests.py' '**/tests/**'",
+            workdir="/testbed",
         ).output.decode("utf-8").strip()
         logger.info(f"Git diff ({len(git_diff)} chars):\n{git_diff[:2000]}")
 
