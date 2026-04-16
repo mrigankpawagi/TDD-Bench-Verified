@@ -146,10 +146,12 @@ def run_instance_prediction(
         if timed_out:
             logger.warning(f"Copilot timed out for {instance_id}")
 
-        # Capture git diff (including untracked files)
+        # Capture git diff against base commit
+        # Only include test files (test*.py) to filter out junk diffs
+        base_commit = instance["base_commit"]
         container.exec_run("git add -N .", workdir="/testbed")
         git_diff = container.exec_run(
-            "git diff", workdir="/testbed"
+            f"git diff {base_commit} -- '**/test*.py'", workdir="/testbed"
         ).output.decode("utf-8").strip()
         logger.info(f"Git diff ({len(git_diff)} chars):\n{git_diff[:2000]}")
 
