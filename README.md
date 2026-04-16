@@ -62,11 +62,11 @@ The `{problem_statement}` placeholder is replaced with the instance's issue desc
 
 Results on the selected-25 problems (default selection with `N=25`, `seed=42`):
 
-| Approach | Resolved (Full) | Resolved (Partial) | TDD Score |
-|----------|-----------------|---------------------|-----------|
-| Otter (GPT-4o) | | | |
-| Otter++ (GPT-4o) | | | |
-| Copilot Basic | | | |
+| Approach | Resolved | TDD Score |
+|----------|----------|-----------|
+| Otter (GPT-4o) | 13 | 0.4534 |
+| Otter++ (GPT-4o) | 13 | 0.4534 |
+| Copilot Basic | 11 | 0.4122 |
 
 # Original README
 
