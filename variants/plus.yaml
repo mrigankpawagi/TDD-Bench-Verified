@@ -4,33 +4,36 @@ prompt: |
   write a reproduction test that fails on the current codebase due to the
   described issue and would pass once the issue is resolved.
 
-  Explore the codebase to understand the relevant code, write the test, and
-  verify it fails by running it. Iterate until you have a failing test that
-  accurately reproduces the issue.
-
-  # Important Guidelines:
+  # Step-by-step instructions:
 
   1. Explore the codebase to understand the relevant code related to the issue.
+
   2. Explore the codebase to find existing tests that touch the relevant code, 
-     and understand how they work.
+     and understand how they are structured, how they set up the context, and
+     how they work. This will help you write a test that is consistent with the
+     existing tests.
+
   3. Decide whether an existing test should be modified to reproduce the issue, 
      or if a new test should be created. If you think that an existing test 
      will break if the issue is fixed, it may be a good candidate for
      modification. New tests should be added to the same test file or class as
      related tests. Create a new test file or class only if there is no related
      test.
-  4. Run the added or modified tests, and possibly other related tests, to
-     verify that they fail and also fail for the right reason (i.e. they fail
-     because of the issue and not because of a mistake in the test).
-  5. Although you will not be fixing the issue, you should think what the fix
-     would look like in order to make sure that the test you wrote would pass
-     once the issue is fixed.
+   
+   4. Run the added or modified tests, and possibly other related tests.
 
-  # Anti-patterns:
+      4a. Check that the tests fail.
+      4b. Check that the test does not fail due to an error in the test setup
+          or an error in the test itself.
+      4c. Check that the test fails specifically because of the issue described
+          in the problem statement.
+      
+      Keep modifying the tests until the above conditions are satisfied and you
+      have a failing test that accurately reproduces the issue.
 
-  * Do not try to fix the issue.
-  * Do not try to commit or push the changes you make.
-  * Do not make changes to the codebase other than the test you are writing or modifying.
+  Although you will not be fixing the issue, you should think what the fix
+  would look like in order to make sure that the test you wrote would pass once
+  the issue is fixed.
 
   # Issue description:
   
