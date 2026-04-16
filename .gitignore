@@ -5,3 +5,7 @@ tddbench.egg-info
 *__pycache__/
 .DS_Store
 tddbench.egg-info
+
+# evaluation results
+Otter__*.json.*.json
+copilot__*.json.*.json
