@@ -66,8 +66,9 @@ Results on the selected-25 problems (default selection with `N=25`, `seed=42`):
 |----------|----------|----------|-----------|
 | Otter (GPT-4o) | 13 | 66.17% | 45.34% |
 | Otter++ (GPT-4o) | 13 | 67.91% | 45.34% |
-| Copilot Basic | 14 | 69.85% | 53.18% |
-| Copilot Plus | 14 | 72.34% | 48.11% |
+| Copilot Basic | 18 | 82.38% | 65.90% |
+| Copilot Plus | 18 | 80.78% | 64.11% |
+| Copilot Pro | 19 | 80.38% | 67.71% |
 
 - **Resolved**: number of instances where the generated tests fail before the fix and pass after (out of 25).
 - **Coverage**: average fraction of the fix's changed lines exercised by the generated tests.
