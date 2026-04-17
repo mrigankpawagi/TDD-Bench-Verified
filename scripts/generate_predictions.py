@@ -28,6 +28,7 @@ from tddbench.harness.docker_build import (
 from tddbench.harness.docker_utils import (
     cleanup_container,
     exec_run_with_timeout,
+    remove_image,
 )
 from tddbench.harness.test_spec import make_test_spec
 
@@ -205,6 +206,7 @@ def run_instance_prediction(
         raise
     finally:
         cleanup_container(client, container, logger)
+        remove_image(client, test_spec.instance_image_key, logger)
         close_logger(logger)
 
 
