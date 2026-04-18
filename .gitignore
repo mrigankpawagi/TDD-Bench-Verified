@@ -1,5 +1,4 @@
-TDD_Bench.json
-TDD_Bench_selected.json
+TDD_Bench*.json
 logs
 tddbench.egg-info
 *__pycache__/
