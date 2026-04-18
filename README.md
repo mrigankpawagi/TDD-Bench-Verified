@@ -7,10 +7,10 @@ Evaluating GitHub Copilot on the TDD-Bench-Verified benchmark of reproduction te
 After following the setup instructions below, prepare a selected subset of the dataset for evaluation:
 
 ```bash
-python scripts/prepare_selected_dataset.py
+python scripts/prepare_selected_dataset.py -o TDD_Bench_selected.json
 ```
 
-This randomly selects 25 items (seed `42`) from `TDD_Bench.json` and writes them to `TDD_Bench_selected.json`. Use `-N` to change the number of items and `--seed` to change the random seed.
+This randomly selects 25 items (seed `42`) from `TDD_Bench.json` and writes them to the specified output file. Use `-o`/`--output` (required) to set the output path, `-N` to change the number of items, and `--seed` to change the random seed.
 
 ## Generating Predictions
 

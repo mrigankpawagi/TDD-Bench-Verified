@@ -39,10 +39,15 @@ Each benchmark instance pairs an issue description with a codebase snapshot (`c_
 - **`run_evaluation.py`** — CLI entry point (`python -m tddbench.harness.run_evaluation`). Loads predictions, builds Docker images, runs tests in containers with timeouts, collects coverage, and writes grading reports.
 - **`grading.py`** — Parses test logs using repo-specific parsers, classifies tests into fail-to-pass / pass-to-pass buckets, and computes resolution status (FULL / PARTIAL / NO).
 - **`log_parsers.py`** — Per-repo test output parsers (pytest, Django, SymPy, etc.) referenced via `MAP_REPO_TO_PARSER`.
+- **`docker_utils.py`** — Utility helpers for Docker operations (copying files into containers, executing commands with timeouts, cleanup).
+- **`dockerfiles.py`** — Dockerfile template strings for the base, env, and instance image layers.
+- **`prepare_images.py`** — Filters dataset instances and pre-builds their Docker images.
+- **`remove_containers.py`** — Removes Docker containers for specified instance IDs.
+- **`utils.py`** — Shared utilities: `load_tddbench_dataset()` for loading data from HuggingFace or local JSON, plus type helpers.
 
 ### `scripts/` — Utility Scripts
 
-- **`prepare_selected_dataset.py`** — Randomly samples items from `TDD_Bench.json` into `TDD_Bench_selected.json`. Supports `-N` for count and `--seed` for reproducibility.
+- **`prepare_selected_dataset.py`** — Randomly samples items from `TDD_Bench.json`. Requires `-o`/`--output` to specify the output file path. Supports `-N` for count and `--seed` for reproducibility.
 - **`generate_predictions.py`** — Orchestrates running Copilot CLI inside harness Docker containers to generate test predictions. Takes `--benchmark` (JSON) and `--variant` (YAML), outputs to `copilot/<variant>.json`. Supports `--max_workers` for parallelism and resume-on-failure.
 
 ### `variants/` — Prompt Variants

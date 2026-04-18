@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Randomly select items from TDD_Bench.json and write to TDD_Bench_selected.json."""
+"""Randomly select items from TDD_Bench.json and write to the specified output file."""
 
 import argparse
 import json
@@ -17,11 +17,14 @@ def main():
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed (default: 42)"
     )
+    parser.add_argument(
+        "-o", "--output", type=Path, required=True, help="Path to the output JSON file"
+    )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
     input_path = repo_root / "TDD_Bench.json"
-    output_path = repo_root / "TDD_Bench_selected.json"
+    output_path = args.output
 
     with open(input_path) as f:
         data = json.load(f)
