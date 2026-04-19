@@ -58,6 +58,14 @@ prompt: |
 
 The `{problem_statement}` placeholder is replaced with the instance's issue description.
 
+**Optional fields:**
+- `plan: true` — runs Copilot CLI with `--plan` mode, which creates a structured plan before executing.
+- `base: <filename>` — inherits all fields from another variant file (resolved relative to `variants/`), then applies any overrides. For example:
+  ```yaml
+  base: pro.yaml
+  plan: true
+  ```
+
 ## Results
 
 Results on the selected-100 problems (default selection with `N=100`, `seed=42`):
