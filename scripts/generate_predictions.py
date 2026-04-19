@@ -158,6 +158,7 @@ def run_instance_prediction(
         )
 
         # Run Copilot CLI
+        plan_flag = " --plan" if variant.get("plan") else ""
         logger.info(f"Running Copilot CLI for {instance_id}...")
         copilot_output, timed_out, runtime = exec_run_with_timeout(
             container,
@@ -165,7 +166,7 @@ def run_instance_prediction(
                 "/bin/bash", "-c",
                 f'source /opt/miniconda3/bin/activate && conda activate testbed && '
                 f'cd /testbed && GH_TOKEN={gh_token} GITHUB_TOKEN={gh_token} '
-                f'{copilot_path} --model {model_name} --yolo --deny-tool=url -p "$(cat /tmp/prompt.txt)"',
+                f'{copilot_path} --model {model_name} --yolo --deny-tool=url{plan_flag} -p "$(cat /tmp/prompt.txt)"',
             ],
             timeout=timeout,
         )
