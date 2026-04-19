@@ -310,6 +310,7 @@ def main():
     successful = sum(1 for r in final_results.values() if r.get("model_patch") and "error" not in r)
     print(f"\nDone. {successful}/{len(dataset)} instances completed successfully.")
     print(f"Results saved to {output_path}")
+    client.close()
 
 
 if __name__ == "__main__":

@@ -60,7 +60,18 @@ The `{problem_statement}` placeholder is replaced with the instance's issue desc
 
 ## Results
 
-Results on the selected-25 problems (default selection with `N=25`, `seed=42`):
+Results on the selected-100 problems (default selection with `N=100`, `seed=42`):
+
+| Approach | Resolved | Coverage | TDD Score |
+|----------|----------|----------|-----------|
+| Otter (GPT-4o) | 31 | 68.00% | 28.53% |
+| Otter++ (GPT-4o) | 35 | 69.96% | 32.49% |
+| Copilot Basic | 65 | 85.07% | 59.76% |
+| Copilot Plus | 57 | 83.21% | 52.06% |
+| Copilot Pro | 66 | 83.85% | 61.46% |
+
+<details>
+<summary>Results on selected-25 (N=25, seed=42)</summary>
 
 | Approach | Resolved | Coverage | TDD Score |
 |----------|----------|----------|-----------|
@@ -70,7 +81,9 @@ Results on the selected-25 problems (default selection with `N=25`, `seed=42`):
 | Copilot Plus | 18 | 80.78% | 64.11% |
 | Copilot Pro | 19 | 80.38% | 67.71% |
 
-- **Resolved**: number of instances where the generated tests fail before the fix and pass after (out of 25).
+</details>
+
+- **Resolved**: number of instances where the generated tests fail before the fix and pass after.
 - **Coverage**: average fraction of the fix's changed lines exercised by the generated tests.
 - **TDD Score**: average of `coverage × fail_before × pass_after` across all instances.
 
