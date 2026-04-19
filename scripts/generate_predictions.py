@@ -49,7 +49,13 @@ def _make_tar(name: str, data: bytes) -> bytes:
 
 def load_variant(variant_path: str) -> dict:
     with open(variant_path) as f:
-        return yaml.safe_load(f)
+        variant = yaml.safe_load(f)
+    if "base" in variant:
+        base_path = Path(variant_path).parent / variant.pop("base")
+        base = load_variant(str(base_path))
+        base.update(variant)
+        return base
+    return variant
 
 
 def load_benchmark(benchmark_path: str) -> list[dict]:
