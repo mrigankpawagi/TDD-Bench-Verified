@@ -164,7 +164,11 @@ def run_instance_prediction(
         )
 
         # Run Copilot CLI
-        plan_flag = " --plan" if variant.get("plan") else ""
+        extra_flags = ""
+        if variant.get("autopilot"):
+            extra_flags += " --autopilot"
+        if variant.get("plan"):
+            extra_flags += " --plan"
         logger.info(f"Running Copilot CLI for {instance_id}...")
         copilot_output, timed_out, runtime = exec_run_with_timeout(
             container,
@@ -172,12 +176,12 @@ def run_instance_prediction(
                 "/bin/bash", "-c",
                 f'source /opt/miniconda3/bin/activate && conda activate testbed && '
                 f'cd /testbed && GH_TOKEN={gh_token} GITHUB_TOKEN={gh_token} '
-                f'{copilot_path} --model {model_name} --yolo --deny-tool=url{plan_flag} -p "$(cat /tmp/prompt.txt)"',
+                f'{copilot_path} --model {model_name} --yolo --deny-tool=url{extra_flags} -p "$(cat /tmp/prompt.txt)"',
             ],
             timeout=timeout,
         )
         logger.info(f"Copilot runtime: {runtime:.2f}s, timed_out: {timed_out}")
-        logger.info(f"Copilot output:\n{copilot_output[-2000:]}")
+        logger.info(f"Copilot output:\n{copilot_output}")
 
         if timed_out:
             logger.warning(f"Copilot timed out for {instance_id}")
@@ -190,7 +194,7 @@ def run_instance_prediction(
             f"git diff {base_commit} -- ':(glob)**/test*.py' ':(glob)**/test*/**'",
             workdir="/testbed",
         ).output.decode("utf-8").strip()
-        logger.info(f"Git diff ({len(git_diff)} chars):\n{git_diff[:2000]}")
+        logger.info(f"Git diff ({len(git_diff)} chars):\n{git_diff}")
 
         result = {
             "instance_id": instance_id,

@@ -60,10 +60,11 @@ The `{problem_statement}` placeholder is replaced with the instance's issue desc
 
 **Optional fields:**
 - `plan: true` — runs Copilot CLI with `--plan` mode, which creates a structured plan before executing.
+- `autopilot: true` — runs Copilot CLI with `--autopilot` mode, which executes autonomously until the task is complete.
 - `base: <filename>` — inherits all fields from another variant file (resolved relative to `variants/`), then applies any overrides. For example:
   ```yaml
   base: pro.yaml
-  plan: true
+  autopilot: true
   ```
 
 ## Results
