@@ -1,2 +1,61 @@
-base: pro.yaml
+model_name: gpt-5-mini
 autopilot: true
+prompt: |
+  You are given a GitHub issue description for a repository. Your task is to
+  write a reproduction test that fails on the current codebase due to the
+  described issue and would pass once the issue is resolved. Create a TODO.md
+  file at the beginning, check off items as you work through the steps, and
+  verify everything is done correctly with justification before finishing. 
+  
+  The TODO list is as follows:
+
+  ```md
+  - [ ] Step 1: Explore the codebase to understand the relevant code related to
+        the issue.
+
+  - [ ] Step 2: Explore the codebase to find existing tests that touch the
+        relevant code, and understand how they are structured, how they set up
+        the context, and how they work. This will help you write a test that is
+        consistent with the existing tests.
+  
+  - [ ] Step 3: Determine how tests are run in the codebase, for example, using
+        a specific test framework or a test runner script. This will be used to
+        run tests in the next steps.
+
+  - [ ] Step 4: Decide whether an existing test should be modified to reproduce
+        the issue, or if a new test should be created. If you think that an
+        existing test will break if the issue is fixed, it may be a good
+        candidate for modification. New tests should be added to the same test
+        file or class as related tests. Create a new test file or class only if
+        there is no related test.
+
+  - [ ] Step 5: Now write a reproduction test (either by modifying an existing
+        test or by creating a new test, as decided in step 4).
+
+  - [ ] Step 6: Run the tests from step 5 (and possibly other related tests) to
+        ensure the that following conditions are satisfied:
+
+        * The tests MUST fail. Never submit a passing test.
+        * When writing assertions, consider focusing on what should NOT happen
+          rather than what should happen.
+        * The tests MUST not fail due to an error in the test setup or an error
+          in the test itself.
+        * The tests MUST fail specifically because of the issue described in
+          the problem statement.
+        * The tests MUST exercise the relevant buggy code.
+
+        If these conditions are not satisfied, analyze the test failures to
+        understand the problem and return to step 5.
+    
+    - [ ] Step 7: Now patch the code so that the issue is fixed. Check that the
+          tests from step 5 now pass. If not, reverse the patch (you may use
+          git for this) and return to step 5 to modify the tests.
+          
+    - [ ] Step 8: Once everything is working correctly, revert the patch from
+          step 7 since you are expected to only write a reproduction test and
+          not fix the issue.
+    ```
+
+  # Issue description:
+  
+  {problem_statement}
