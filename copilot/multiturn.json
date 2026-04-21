@@ -1,0 +1,22 @@
+[
+  {
+    "instance_id": "django__django-11880",
+    "model_patch": "diff --git a/tests/forms_tests/tests/test_field_deepcopy.py b/tests/forms_tests/tests/test_field_deepcopy.py\nnew file mode 100644\nindex 0000000000..320ae54ec4\n--- /dev/null\n+++ b/tests/forms_tests/tests/test_field_deepcopy.py\n@@ -0,0 +1,14 @@\n+from django.test import SimpleTestCase\n+from django.forms import CharField\n+import copy\n+\n+\n+class FieldDeepCopyTests(SimpleTestCase):\n+    def test_deepcopy_copies_error_messages(self):\n+        f = CharField(error_messages={'custom': 'orig'})\n+        f2 = copy.deepcopy(f)\n+        # They must not be the same object\n+        self.assertIsNot(f.error_messages, f2.error_messages)\n+        # Mutating one should not affect the other\n+        f.error_messages['custom'] = 'changed'\n+        self.assertEqual(f2.error_messages.get('custom'), 'orig')",
+    "model_name_or_path": "gpt-5-mini"
+  },
+  {
+    "instance_id": "scikit-learn__scikit-learn-13328",
+    "model_patch": "",
+    "model_name_or_path": "gpt-5-mini"
+  },
+  {
+    "instance_id": "sphinx-doc__sphinx-9673",
+    "model_patch": "",
+    "model_name_or_path": "gpt-5-mini"
+  },
+  {
+    "instance_id": "astropy__astropy-14598",
+    "model_patch": "",
+    "model_name_or_path": "gpt-5-mini"
+  }
+]

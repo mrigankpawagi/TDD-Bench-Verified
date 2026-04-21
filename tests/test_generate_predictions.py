@@ -455,9 +455,10 @@ class TestRunMultiStep:
         assert "--yolo" in first_cmd_str
         assert "--continue" not in first_cmd_str
 
-        # Second should have --continue
+        # Second should have --continue and --yolo
         second_cmd_str = str(commands_seen[1])
         assert "--continue" in second_cmd_str
+        assert "--yolo" in second_cmd_str
 
     def test_problem_statement_formatted_in_prompt(self):
         """Verify {problem_statement} is substituted in the prompt."""
