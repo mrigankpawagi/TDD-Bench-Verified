@@ -6,6 +6,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import tarfile
 import tempfile
 import threading
@@ -58,6 +59,43 @@ def load_variant(variant_path: str) -> dict:
     return variant
 
 
+def validate_variant(variant: dict) -> None:
+    """Validate variant schema: must have exactly one of 'prompt' or 'steps'."""
+    has_prompt = "prompt" in variant
+    has_steps = "steps" in variant
+    if has_prompt == has_steps:
+        raise ValueError("Variant must have exactly one of 'prompt' or 'steps'")
+    if has_steps:
+        steps = variant["steps"]
+        if not steps:
+            raise ValueError("'steps' must be non-empty")
+        step_names_list = [s["name"] for s in steps]
+        if len(step_names_list) != len(set(step_names_list)):
+            raise ValueError("Duplicate step names found in 'steps'")
+        step_names = set(step_names_list)
+        for step in steps:
+            if "transitions" not in step:
+                raise ValueError(f"Step '{step['name']}' is missing 'transitions'")
+            for status, transition in step["transitions"].items():
+                target = transition["goto"]
+                if target != "done" and target not in step_names:
+                    raise ValueError(
+                        f"Step '{step['name']}' has invalid goto target '{target}'"
+                    )
+
+
+def _parse_status(output: str, valid_statuses: list[str]) -> str | None:
+    """Parse STATUS: XXX from the last non-empty lines of copilot output."""
+    for line in reversed(output.strip().split("\n")):
+        line = line.strip()
+        if not line:
+            continue
+        m = re.match(r"^.*STATUS:\s*([A-Z0-9_]+)\s*$", line)
+        if m and m.group(1) in valid_statuses:
+            return m.group(1)
+    return None
+
+
 def load_benchmark(benchmark_path: str) -> list[dict]:
     with open(benchmark_path) as f:
         return json.load(f)
@@ -89,6 +127,111 @@ def save_result(output_path: Path, result: dict, lock: threading.Lock):
         except Exception:
             os.unlink(tmp_path)
             raise
+
+
+def _run_multi_step(
+    variant: dict,
+    container,
+    copilot_path: str,
+    model_name: str,
+    extra_flags: str,
+    env_prefix: str,
+    problem_statement: str,
+    total_timeout: int,
+    logger,
+) -> str:
+    """Run a multi-step state machine of Copilot CLI invocations using --continue."""
+    steps = {s["name"]: s for s in variant["steps"]}
+    max_retries = variant.get("max_retries", 3)
+    current_step = variant["steps"][0]["name"]
+    is_first = True
+    total_runtime = 0.0
+    retry_count = 0
+    all_output: list[str] = []
+
+    while current_step != "done":
+        if retry_count > max_retries:
+            logger.warning(f"Max retries ({max_retries}) exceeded. Stopping.")
+            break
+
+        remaining_timeout = total_timeout - int(total_runtime)
+        if remaining_timeout <= 0:
+            logger.warning("Total timeout budget exhausted across steps.")
+            break
+
+        step = steps[current_step]
+
+        # Build the prompt for this step
+        prompt = step["prompt"].format(problem_statement=problem_statement)
+        if not is_first and transition.get("instruction"):
+            prompt = transition["instruction"].strip() + "\n\n" + prompt
+
+        # Write prompt to file in container
+        container.put_archive("/tmp", _make_tar("prompt.txt", prompt.encode()))
+
+        if is_first:
+            cmd = (
+                f'{copilot_path} --model {model_name} --yolo{extra_flags} '
+                f'-p "$(cat /tmp/prompt.txt)"'
+            )
+            is_first = False
+        else:
+            cmd = f'{copilot_path} --continue -p "$(cat /tmp/prompt.txt)"'
+
+        logger.info(f"Step '{current_step}' starting (budget: {remaining_timeout}s)...")
+        copilot_output, timed_out, runtime = exec_run_with_timeout(
+            container,
+            ["/bin/bash", "-c", f"{env_prefix}{cmd}"],
+            timeout=remaining_timeout,
+        )
+        total_runtime += runtime
+        logger.info(f"Step '{current_step}' runtime: {runtime:.2f}s, timed_out: {timed_out}")
+        logger.info(f"Step '{current_step}' output:\n{copilot_output[-2000:]}")
+        all_output.append(f"=== Step: {current_step} ===\n{copilot_output}")
+
+        if timed_out:
+            logger.warning(f"Timed out during step '{current_step}'")
+            break
+
+        # Parse status from output
+        valid_statuses = list(step["transitions"].keys())
+        status = _parse_status(copilot_output, valid_statuses)
+
+        if status is None:
+            logger.warning(
+                f"No valid STATUS found in step '{current_step}' output. "
+                f"Expected one of: {valid_statuses}. Retrying same step."
+            )
+            retry_count += 1
+            # Re-prompt asking for the status
+            transition = {
+                "goto": current_step,
+                "instruction": (
+                    "You did not end your response with a STATUS line. "
+                    "Please complete the step and end with the appropriate "
+                    f"STATUS: {' / '.join(valid_statuses)}"
+                ),
+            }
+            continue
+
+        logger.info(f"Step '{current_step}' returned STATUS: {status}")
+        transition = step["transitions"][status]
+        next_step = transition["goto"]
+
+        # Track retries when looping back
+        if next_step != "done" and next_step != current_step:
+            # Moving forward — check if we're going back to a prior step
+            step_order = [s["name"] for s in variant["steps"]]
+            if (next_step in step_order and current_step in step_order
+                    and step_order.index(next_step) < step_order.index(current_step)):
+                retry_count += 1
+        elif next_step == current_step:
+            retry_count += 1
+
+        current_step = next_step
+
+    logger.info(f"Multi-step total runtime: {total_runtime:.2f}s, retries used: {retry_count}")
+    return "\n".join(all_output)
 
 
 def run_instance_prediction(
@@ -143,17 +286,7 @@ def run_instance_prediction(
             raise RuntimeError("Copilot CLI binary not found after installation")
         logger.info(f"Copilot binary at: {copilot_path}")
 
-        # Interpolate prompt
-        prompt_template = variant["prompt"]
-        prompt = prompt_template.format(
-            problem_statement=instance.get("problem_statement", ""),
-        )
-
-        # Write prompt to a file inside the container to avoid bash quoting issues
-        # (problem statements often contain backticks, $(), >, etc.)
-        prompt_bytes = prompt.encode("utf-8")
         container.exec_run("mkdir -p /tmp", workdir="/testbed")
-        container.put_archive("/tmp", _make_tar("prompt.txt", prompt_bytes))
 
         # Activate the conda environment so Copilot's shell commands can use
         # pytest and other project dependencies that are installed there.
@@ -163,28 +296,45 @@ def run_instance_prediction(
             workdir="/testbed",
         )
 
-        # Run Copilot CLI
-        extra_flags = ""
+        # Build extra CLI flags
+        extra_flags = " --deny-tool=url"
         if variant.get("autopilot"):
             extra_flags += " --autopilot"
         if variant.get("plan"):
             extra_flags += " --plan"
-        logger.info(f"Running Copilot CLI for {instance_id}...")
-        copilot_output, timed_out, runtime = exec_run_with_timeout(
-            container,
-            [
-                "/bin/bash", "-c",
-                f'source /opt/miniconda3/bin/activate && conda activate testbed && '
-                f'cd /testbed && GH_TOKEN={gh_token} GITHUB_TOKEN={gh_token} '
-                f'{copilot_path} --model {model_name} --yolo --deny-tool=url{extra_flags} -p "$(cat /tmp/prompt.txt)"',
-            ],
-            timeout=timeout,
-        )
-        logger.info(f"Copilot runtime: {runtime:.2f}s, timed_out: {timed_out}")
-        logger.info(f"Copilot output:\n{copilot_output}")
 
-        if timed_out:
-            logger.warning(f"Copilot timed out for {instance_id}")
+        problem_statement = instance.get("problem_statement", "")
+        env_prefix = (
+            f"source /opt/miniconda3/bin/activate && conda activate testbed && "
+            f"cd /testbed && GH_TOKEN={gh_token} GITHUB_TOKEN={gh_token} "
+        )
+
+        if "steps" in variant:
+            # ── Multi-step state machine ──
+            copilot_output = _run_multi_step(
+                variant, container, copilot_path, model_name,
+                extra_flags, env_prefix, problem_statement,
+                timeout, logger,
+            )
+        else:
+            # ── Single-prompt (backward compatible) ──
+            prompt = variant["prompt"].format(problem_statement=problem_statement)
+            container.put_archive("/tmp", _make_tar("prompt.txt", prompt.encode()))
+
+            logger.info(f"Running Copilot CLI for {instance_id}...")
+            copilot_output, timed_out, runtime = exec_run_with_timeout(
+                container,
+                ["/bin/bash", "-c",
+                 f'{env_prefix}'
+                 f'{copilot_path} --model {model_name} --yolo{extra_flags} '
+                 f'-p "$(cat /tmp/prompt.txt)"'],
+                timeout=timeout,
+            )
+            logger.info(f"Copilot runtime: {runtime:.2f}s, timed_out: {timed_out}")
+            logger.info(f"Copilot output:\n{copilot_output[-2000:]}")
+
+            if timed_out:
+                logger.warning(f"Copilot timed out for {instance_id}")
 
         # Capture git diff against base commit
         # Include test files and anything under test* directories
@@ -243,6 +393,7 @@ def main():
 
     # Load inputs
     variant = load_variant(args.variant)
+    validate_variant(variant)
     dataset = load_benchmark(args.benchmark)
     variant_name = Path(args.variant).stem
     run_id = f"generate-{variant_name}"

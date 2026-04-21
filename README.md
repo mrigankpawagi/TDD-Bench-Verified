@@ -67,6 +67,32 @@ The `{problem_statement}` placeholder is replaced with the instance's issue desc
   autopilot: true
   ```
 
+**Multi-step variants:** Instead of a single `prompt`, a variant can define `steps` — a state machine of prompts that run sequentially using `copilot --continue` to maintain conversation context. Each step outputs a `STATUS:` line that the script uses to decide the next step (or loop back). See `variants/multiprompt.yaml` for an example.
+
+```yaml
+max_retries: 3
+steps:
+  - name: explore
+    prompt: |
+      ...
+      STATUS: EXPLORE_DONE
+    transitions:
+      EXPLORE_DONE:
+        goto: write_test
+        instruction: ""
+  - name: write_test
+    prompt: |
+      ...
+      STATUS: TEST_FAILS / TEST_PASSES / TEST_ERRORS
+    transitions:
+      TEST_FAILS:
+        goto: verify
+        instruction: ""
+      TEST_PASSES:
+        goto: write_test
+        instruction: "The test passes. Rewrite it..."
+```
+
 ## Results
 
 Results on the selected-100 problems (default selection with `N=100`, `seed=42`):

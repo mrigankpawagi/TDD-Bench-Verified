@@ -48,11 +48,11 @@ Each benchmark instance pairs an issue description with a codebase snapshot (`c_
 ### `scripts/` — Utility Scripts
 
 - **`prepare_selected_dataset.py`** — Randomly samples items from `TDD_Bench.json`. Requires `-o`/`--output` to specify the output file path. Supports `-N` for count and `--seed` for reproducibility.
-- **`generate_predictions.py`** — Orchestrates running Copilot CLI inside harness Docker containers to generate test predictions. Takes `--benchmark` (JSON) and `--variant` (YAML), outputs to `copilot/<variant>.json`. Supports `--max_workers` for parallelism and resume-on-failure.
+- **`generate_predictions.py`** — Orchestrates running Copilot CLI inside harness Docker containers to generate test predictions. Takes `--benchmark` (JSON) and `--variant` (YAML), outputs to `copilot/<variant>.json`. Supports `--max_workers` for parallelism, resume-on-failure, and multi-step state machine variants using `copilot --continue`.
 
 ### `variants/` — Prompt Variants
 
-YAML files defining `model_name` and `prompt` template (with `{problem_statement}` placeholder) for different prediction strategies.
+YAML files defining `model_name` and either a single `prompt` template (with `{problem_statement}` placeholder) or a `steps` array for multi-step state machine variants. See `variants/multiprompt.yaml` for the state machine format.
 
 ### Key Data Files
 

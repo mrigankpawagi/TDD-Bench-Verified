@@ -1,0 +1,75 @@
+model_name: gpt-5-mini
+autopilot: true
+max_retries: 3
+
+steps:
+  - name: explore
+    prompt: |
+      You are given a GitHub issue description for a repository. Explore the
+      codebase to understand the issue. Find relevant source files, existing
+      tests, and how tests are run.
+
+      When done, end your response with exactly:
+      STATUS: EXPLORE_DONE
+
+      # Issue description:
+
+      {problem_statement}
+    transitions:
+      EXPLORE_DONE:
+        goto: write_test
+        instruction: ""
+
+  - name: write_test
+    prompt: |
+      Now write a reproduction test that FAILS on the current codebase due to
+      the bug you just explored. Follow the same conventions as existing tests.
+      Run the test and confirm it fails because of the bug (not setup errors).
+
+      When done, end your response with exactly one of:
+      - STATUS: TEST_FAILS  (test fails for the right reason)
+      - STATUS: TEST_PASSES (test unexpectedly passes)
+      - STATUS: TEST_ERRORS (test errors due to setup/import issues)
+    transitions:
+      TEST_FAILS:
+        goto: verify
+        instruction: ""
+      TEST_PASSES:
+        goto: write_test
+        instruction: >
+          The test you wrote passes on the current (buggy) code, which means
+          it does not reproduce the bug. Analyze why and rewrite the test so
+          it actually exercises the buggy code path and fails.
+      TEST_ERRORS:
+        goto: write_test
+        instruction: >
+          The test has setup or import errors. Check that you are using the
+          correct test base class, imports, and fixtures consistent with
+          existing tests in this repo. Fix the errors and try again.
+
+  - name: verify
+    prompt: |
+      Now verify your test is correct:
+      1. Patch the source code to fix the bug.
+      2. Run the test — it should now PASS.
+      3. Revert the patch: git checkout -- .
+      4. Run the test again — it should FAIL.
+
+      When done, end your response with exactly one of:
+      - STATUS: VERIFIED       (test passes after patch, fails after revert)
+      - STATUS: PATCH_FAILED   (could not figure out the fix)
+      - STATUS: TEST_WRONG     (test does not pass even after patching)
+    transitions:
+      VERIFIED:
+        goto: done
+        instruction: ""
+      PATCH_FAILED:
+        goto: done
+        instruction: ""
+      TEST_WRONG:
+        goto: write_test
+        instruction: >
+          The test still fails even after patching the code to fix the bug.
+          This means the test assertions are wrong. Go back, analyze what the
+          correct behavior should be after the fix, and rewrite the test with
+          correct assertions.
