@@ -52,7 +52,7 @@ Each benchmark instance pairs an issue description with a codebase snapshot (`c_
 
 ### `variants/` — Prompt Variants
 
-YAML files defining `model_name` and either a single `prompt` template (with `{problem_statement}` placeholder) or a `steps` array for multi-step state machine variants. See `variants/multiprompt.yaml` for the state machine format.
+YAML files defining `model_name` and either a single `prompt` template (with `{problem_statement}` placeholder) or a `steps` array for multi-step state machine variants. See `variants/multiturn.yaml` for the state machine format.
 
 ### Key Data Files
 

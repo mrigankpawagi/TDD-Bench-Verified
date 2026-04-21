@@ -67,7 +67,7 @@ The `{problem_statement}` placeholder is replaced with the instance's issue desc
   autopilot: true
   ```
 
-**Multi-step variants:** Instead of a single `prompt`, a variant can define `steps` — a state machine of prompts that run sequentially using `copilot --continue` to maintain conversation context. Each step outputs a `STATUS:` line that the script uses to decide the next step (or loop back). See `variants/multiprompt.yaml` for an example.
+**Multi-step variants:** Instead of a single `prompt`, a variant can define `steps` — a state machine of prompts that run sequentially using `copilot --continue` to maintain conversation context. Each step outputs a `STATUS:` line that the script uses to decide the next step (or loop back). See `variants/multiturn.yaml` for an example.
 
 ```yaml
 max_retries: 3
@@ -105,6 +105,7 @@ Results on the selected-100 problems (default selection with `N=100`, `seed=42`)
 | Copilot Plus | 57 | 83.21% | 52.06% |
 | Copilot Pro | 66 | 83.85% | 61.46% |
 | Copilot ProPlus | 65 | — | — |
+| Copilot MultiTurn | — | — | — |
 
 <details>
 <summary>Results on selected-25 (N=25, seed=42)</summary>
