@@ -104,7 +104,7 @@ Results on the selected-100 problems (default selection with `N=100`, `seed=42`)
 | Copilot Basic | 65 | 85.07% | 59.76% |
 | Copilot Plus | 57 | 83.21% | 52.06% |
 | Copilot Pro | 66 | 83.85% | 61.46% |
-| Copilot ProPlus | 65 | — | — |
+| Copilot ProPlus | 59 | 85.03% | 52.98% |
 | Copilot MultiTurn | — | — | — |
 
 <details>
