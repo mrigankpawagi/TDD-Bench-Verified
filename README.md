@@ -79,7 +79,6 @@ steps:
     transitions:
       EXPLORE_DONE:
         goto: write_test
-        instruction: ""
   - name: write_test
     prompt: |
       ...
@@ -87,7 +86,6 @@ steps:
     transitions:
       TEST_FAILS:
         goto: verify
-        instruction: ""
       TEST_PASSES:
         goto: write_test
         instruction: "The test passes. Rewrite it..."

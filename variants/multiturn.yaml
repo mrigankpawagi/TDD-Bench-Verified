@@ -6,8 +6,15 @@ steps:
   - name: explore
     prompt: |
       You are given a GitHub issue description for a repository. Explore the
-      codebase to understand the issue. Find relevant source files, existing
-      tests, and how tests are run.
+      codebase to understand the issue. Find relevant source files related to
+      the issue to locate the buggy code.
+
+      Explore the existing tests in the codebase that touch the relevant code.
+      Understand how tests are structured, how they set up the context, and how
+      they are run (e.g. test framework, test runner script).
+
+      You may also try to run a test to ensure you understand how to run tests
+      in this codebase.
 
       When done, end your response with exactly:
       STATUS: EXPLORE_DONE
@@ -18,7 +25,6 @@ steps:
     transitions:
       EXPLORE_DONE:
         goto: write_test
-        instruction: ""
 
   - name: write_test
     prompt: |
@@ -33,7 +39,6 @@ steps:
     transitions:
       TEST_FAILS:
         goto: verify
-        instruction: ""
       TEST_PASSES:
         goto: write_test
         instruction: >
@@ -62,10 +67,8 @@ steps:
     transitions:
       VERIFIED:
         goto: done
-        instruction: ""
       PATCH_FAILED:
         goto: done
-        instruction: ""
       TEST_WRONG:
         goto: write_test
         instruction: >

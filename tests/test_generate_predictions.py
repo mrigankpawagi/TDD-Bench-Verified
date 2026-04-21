@@ -141,7 +141,7 @@ class TestLoadVariant:
                 {
                     "name": "explore",
                     "prompt": "Explore {problem_statement}",
-                    "transitions": {"DONE": {"goto": "done", "instruction": ""}},
+                    "transitions": {"DONE": {"goto": "done"}},
                 }
             ],
         }
@@ -166,7 +166,7 @@ class TestValidateVariant:
                 {
                     "name": "step1",
                     "prompt": "...",
-                    "transitions": {"OK": {"goto": "done", "instruction": ""}},
+                    "transitions": {"OK": {"goto": "done"}},
                 }
             ],
         })
@@ -190,7 +190,7 @@ class TestValidateVariant:
                     {
                         "name": "s1",
                         "prompt": "...",
-                        "transitions": {"OK": {"goto": "nonexistent", "instruction": ""}},
+                        "transitions": {"OK": {"goto": "nonexistent"}},
                     }
                 ]
             })
@@ -206,7 +206,7 @@ class TestValidateVariant:
                 {
                     "name": "only",
                     "prompt": "...",
-                    "transitions": {"DONE": {"goto": "done", "instruction": ""}},
+                    "transitions": {"DONE": {"goto": "done"}},
                 }
             ],
         })
@@ -217,12 +217,12 @@ class TestValidateVariant:
                 {
                     "name": "a",
                     "prompt": "...",
-                    "transitions": {"OK": {"goto": "b", "instruction": ""}},
+                    "transitions": {"OK": {"goto": "b"}},
                 },
                 {
                     "name": "b",
                     "prompt": "...",
-                    "transitions": {"OK": {"goto": "done", "instruction": ""}},
+                    "transitions": {"OK": {"goto": "done"}},
                 },
             ],
         })
@@ -234,12 +234,12 @@ class TestValidateVariant:
                 {
                     "name": "explore",
                     "prompt": "...",
-                    "transitions": {"OK": {"goto": "done", "instruction": ""}},
+                    "transitions": {"OK": {"goto": "done"}},
                 },
                 {
                     "name": "explore",
                     "prompt": "...",
-                    "transitions": {"OK": {"goto": "done", "instruction": ""}},
+                    "transitions": {"OK": {"goto": "done"}},
                 },
             ],
         }
@@ -338,9 +338,9 @@ class TestRunMultiStep:
     def test_happy_path_three_steps(self):
         """explore → write_test → verify → done"""
         variant = self._make_variant([
-            self._make_step("explore", {"EXPLORE_DONE": {"goto": "write_test", "instruction": ""}}),
-            self._make_step("write_test", {"TEST_FAILS": {"goto": "verify", "instruction": ""}}),
-            self._make_step("verify", {"VERIFIED": {"goto": "done", "instruction": ""}}),
+            self._make_step("explore", {"EXPLORE_DONE": {"goto": "write_test"}}),
+            self._make_step("write_test", {"TEST_FAILS": {"goto": "verify"}}),
+            self._make_step("verify", {"VERIFIED": {"goto": "done"}}),
         ])
         outputs = [
             ("Explored the codebase.\nSTATUS: EXPLORE_DONE", False, 10.0),
@@ -355,12 +355,12 @@ class TestRunMultiStep:
     def test_retry_on_loop_back(self):
         """write_test returns TEST_PASSES → loops back → then succeeds."""
         variant = self._make_variant([
-            self._make_step("explore", {"EXPLORE_DONE": {"goto": "write_test", "instruction": ""}}),
+            self._make_step("explore", {"EXPLORE_DONE": {"goto": "write_test"}}),
             self._make_step("write_test", {
-                "TEST_FAILS": {"goto": "verify", "instruction": ""},
+                "TEST_FAILS": {"goto": "verify"},
                 "TEST_PASSES": {"goto": "write_test", "instruction": "Rewrite the test."},
             }),
-            self._make_step("verify", {"VERIFIED": {"goto": "done", "instruction": ""}}),
+            self._make_step("verify", {"VERIFIED": {"goto": "done"}}),
         ])
         outputs = [
             ("STATUS: EXPLORE_DONE", False, 5.0),
@@ -390,8 +390,8 @@ class TestRunMultiStep:
     def test_timeout_budget_exhausted(self):
         """Stops when total timeout budget is used up."""
         variant = self._make_variant([
-            self._make_step("s1", {"OK": {"goto": "s2", "instruction": ""}}),
-            self._make_step("s2", {"OK": {"goto": "done", "instruction": ""}}),
+            self._make_step("s1", {"OK": {"goto": "s2"}}),
+            self._make_step("s2", {"OK": {"goto": "done"}}),
         ])
         outputs = [
             ("STATUS: OK", False, 1800.0),  # uses entire budget
@@ -402,7 +402,7 @@ class TestRunMultiStep:
     def test_missing_status_retries_same_step(self):
         """No STATUS line → re-prompts same step, then succeeds."""
         variant = self._make_variant([
-            self._make_step("s", {"DONE": {"goto": "done", "instruction": ""}}),
+            self._make_step("s", {"DONE": {"goto": "done"}}),
         ])
         outputs = [
             ("Some output without status", False, 5.0),  # no STATUS
@@ -414,7 +414,7 @@ class TestRunMultiStep:
     def test_timed_out_step_stops(self):
         """If a step times out, the state machine stops immediately."""
         variant = self._make_variant([
-            self._make_step("s", {"OK": {"goto": "done", "instruction": ""}}),
+            self._make_step("s", {"OK": {"goto": "done"}}),
         ])
         outputs = [
             ("partial output...", True, 1800.0),  # timed_out=True
@@ -425,8 +425,8 @@ class TestRunMultiStep:
     def test_first_step_uses_yolo_subsequent_use_continue(self):
         """First invocation uses --model/--yolo, subsequent use --continue."""
         variant = self._make_variant([
-            self._make_step("s1", {"OK": {"goto": "s2", "instruction": ""}}),
-            self._make_step("s2", {"OK": {"goto": "done", "instruction": ""}}),
+            self._make_step("s1", {"OK": {"goto": "s2"}}),
+            self._make_step("s2", {"OK": {"goto": "done"}}),
         ])
         outputs = [
             ("STATUS: OK", False, 5.0),
@@ -462,7 +462,7 @@ class TestRunMultiStep:
     def test_problem_statement_formatted_in_prompt(self):
         """Verify {problem_statement} is substituted in the prompt."""
         variant = self._make_variant([
-            self._make_step("s", {"OK": {"goto": "done", "instruction": ""}},
+            self._make_step("s", {"OK": {"goto": "done"}},
                             prompt="Issue: {problem_statement}"),
         ])
         outputs = [("STATUS: OK", False, 5.0)]
