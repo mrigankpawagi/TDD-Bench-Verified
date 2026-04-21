@@ -176,7 +176,7 @@ def _run_multi_step(
             )
             is_first = False
         else:
-            cmd = f'{copilot_path} --continue --yolo -p "$(cat /tmp/prompt.txt)"'
+            cmd = f'{copilot_path} --continue --yolo{extra_flags} -p "$(cat /tmp/prompt.txt)"'
 
         logger.info(f"Step '{current_step}' starting (budget: {remaining_timeout}s)...")
         copilot_output, timed_out, runtime = exec_run_with_timeout(
