@@ -29,8 +29,26 @@ steps:
   - name: write_test
     prompt: |
       Now write a reproduction test that FAILS on the current codebase due to
-      the bug you just explored. Follow the same conventions as existing tests.
-      Run the test and confirm it fails because of the bug (not setup errors).
+      the bug you just explored.
+      
+      Decide whether an existing test should be modified to reproduce the
+      issue, or if a new test should be created. If you think that an existing
+      test will break if the issue is fixed, it may be a good candidate for
+      modification. New tests should be added to the same test file or class as
+      related tests. Create a new test file or class only if there is no
+      related test.
+
+      Run the tests you added/modified (and possibly other related tests) to
+      ensure the that following conditions are satisfied:
+
+        * The tests MUST fail. Never submit a passing test.
+        * When writing assertions, consider focusing on what should NOT happen
+          rather than what should happen.
+        * The tests MUST not fail due to an error in the test setup or an error
+          in the test itself.
+        * The tests MUST fail specifically because of the issue described in
+          the problem statement.
+        * The tests MUST exercise the relevant buggy code.
 
       When done, end your response with exactly one of:
       - STATUS: TEST_FAILS  (test fails for the right reason)
