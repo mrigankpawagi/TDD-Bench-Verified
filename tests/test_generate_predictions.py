@@ -287,6 +287,75 @@ class TestResultIO:
         assert path.exists()
 
 
+# ── _parse_jsonl_to_text ─────────────────────────────────────────────────────
+
+
+class TestParseJsonlToText:
+    def test_response_events(self):
+        jsonl = '{"type": "response", "body": "Hello world"}\n'
+        result = gp._parse_jsonl_to_text(jsonl)
+        assert "Hello world" in result
+
+    def test_tool_call_events(self):
+        jsonl = '{"type": "tool_call", "tool": "shell", "arguments": {"command": "ls"}}\n'
+        result = gp._parse_jsonl_to_text(jsonl)
+        assert ">>> Tool call: shell" in result
+        assert '"command"' in result
+
+    def test_tool_result_events(self):
+        jsonl = '{"type": "tool_result", "tool": "shell", "result": "file1.py\\nfile2.py"}\n'
+        result = gp._parse_jsonl_to_text(jsonl)
+        assert "<<< Tool result: shell" in result
+
+    def test_error_events(self):
+        jsonl = '{"type": "error", "message": "Rate limited"}\n'
+        result = gp._parse_jsonl_to_text(jsonl)
+        assert "[ERROR]" in result
+        assert "Rate limited" in result
+
+    def test_non_json_lines_preserved(self):
+        result = gp._parse_jsonl_to_text("plain text output\n")
+        assert "plain text output" in result
+
+    def test_empty_input(self):
+        assert gp._parse_jsonl_to_text("") == ""
+
+    def test_mixed_events(self):
+        jsonl = (
+            '{"type": "response", "body": "Exploring..."}\n'
+            '{"type": "tool_call", "tool": "shell", "arguments": {"command": "find . -name test*"}}\n'
+            '{"type": "tool_result", "tool": "shell", "result": "tests/test_foo.py"}\n'
+            '{"type": "response", "body": "Found tests."}\n'
+        )
+        result = gp._parse_jsonl_to_text(jsonl)
+        assert "Exploring..." in result
+        assert ">>> Tool call: shell" in result
+        assert "<<< Tool result: shell" in result
+        assert "Found tests." in result
+
+
+# ── _save_copilot_output ─────────────────────────────────────────────────────
+
+
+class TestSaveCopilotOutput:
+    def test_saves_jsonl_file(self, tmp_path):
+        logger = MagicMock()
+        jsonl = '{"type": "response", "body": "Hello"}\n'
+        gp._save_copilot_output(tmp_path, jsonl, "step_0_explore", logger)
+        jsonl_path = tmp_path / "copilot_output_step_0_explore.jsonl"
+        assert jsonl_path.exists()
+        assert jsonl_path.read_text() == jsonl
+
+    def test_logs_parsed_text(self, tmp_path):
+        logger = MagicMock()
+        jsonl = '{"type": "response", "body": "Done"}\n'
+        gp._save_copilot_output(tmp_path, jsonl, "single", logger)
+        # Should log twice: once for JSONL path, once for parsed output
+        assert logger.info.call_count == 2
+        parsed_log = logger.info.call_args_list[1][0][0]
+        assert "Done" in parsed_log
+
+
 # ── _run_multi_step ──────────────────────────────────────────────────────────
 
 

@@ -35,6 +35,7 @@ from tddbench.harness.test_spec import make_test_spec
 
 COPILOT_INSTALL_CMD = "curl -fsSL https://gh.io/copilot-install | bash"
 COPILOT_BIN = "/usr/local/bin/copilot"
+COPILOT_JSON_FLAG = " --output-format json"
 
 
 def _make_tar(name: str, data: bytes) -> bytes:
@@ -46,6 +47,66 @@ def _make_tar(name: str, data: bytes) -> bytes:
         tar.addfile(info, io.BytesIO(data))
     buf.seek(0)
     return buf.read()
+
+
+def _parse_jsonl_to_text(jsonl_output: str) -> str:
+    """Parse Copilot JSONL output into human-readable text with expanded tool calls."""
+    lines = []
+    for raw_line in jsonl_output.strip().split("\n"):
+        raw_line = raw_line.strip()
+        if not raw_line:
+            continue
+        try:
+            event = json.loads(raw_line)
+        except json.JSONDecodeError:
+            lines.append(raw_line)
+            continue
+
+        event_type = event.get("type", "")
+        if event_type == "response":
+            body = event.get("body", "")
+            if body:
+                lines.append(body)
+        elif event_type == "tool_call":
+            name = event.get("tool", event.get("name", "unknown"))
+            args = event.get("arguments", event.get("args", {}))
+            if isinstance(args, dict):
+                args_str = json.dumps(args, indent=2)
+            else:
+                args_str = str(args)
+            lines.append(f"\n>>> Tool call: {name}")
+            lines.append(args_str)
+        elif event_type == "tool_result":
+            name = event.get("tool", event.get("name", ""))
+            result = event.get("result", event.get("output", ""))
+            if isinstance(result, dict):
+                result_str = json.dumps(result, indent=2)
+            else:
+                result_str = str(result)
+            header = f"<<< Tool result: {name}" if name else "<<< Tool result"
+            lines.append(header)
+            lines.append(result_str)
+        elif event_type == "error":
+            lines.append(f"[ERROR] {event.get('message', event.get('body', ''))}")
+        elif event_type == "status":
+            lines.append(f"[STATUS] {event.get('body', event.get('message', ''))}")
+        else:
+            # Unknown event type — include raw for debugging
+            body = event.get("body", event.get("message", ""))
+            if body:
+                lines.append(str(body))
+
+    return "\n".join(lines)
+
+
+def _save_copilot_output(log_dir: Path, copilot_output: str, label: str, logger) -> None:
+    """Save raw JSONL and parsed text log for a copilot invocation."""
+    jsonl_path = log_dir / f"copilot_output_{label}.jsonl"
+    jsonl_path.write_text(copilot_output)
+    logger.info(f"Raw JSONL saved to {jsonl_path}")
+
+    parsed = _parse_jsonl_to_text(copilot_output)
+    logger.info(f"Copilot output ({label}):\n{parsed}")
 
 
 def load_variant(variant_path: str) -> dict:
@@ -139,6 +200,7 @@ def _run_multi_step(
     problem_statement: str,
     total_timeout: int,
     logger,
+    log_dir: Path | None = None,
 ) -> str:
     """Run a multi-step state machine of Copilot CLI invocations using --continue."""
     steps = {s["name"]: s for s in variant["steps"]}
@@ -147,6 +209,7 @@ def _run_multi_step(
     is_first = True
     total_runtime = 0.0
     retry_count = 0
+    step_count = 0
     all_output: list[str] = []
 
     while current_step != "done":
@@ -171,12 +234,15 @@ def _run_multi_step(
 
         if is_first:
             cmd = (
-                f'{copilot_path} --model {model_name} --yolo{extra_flags} '
-                f'-p "$(cat /tmp/prompt.txt)"'
+                f'{copilot_path} --model {model_name} --yolo{extra_flags}'
+                f'{COPILOT_JSON_FLAG} -p "$(cat /tmp/prompt.txt)"'
             )
             is_first = False
         else:
-            cmd = f'{copilot_path} --continue --yolo{extra_flags} -p "$(cat /tmp/prompt.txt)"'
+            cmd = (
+                f'{copilot_path} --continue --yolo{extra_flags}'
+                f'{COPILOT_JSON_FLAG} -p "$(cat /tmp/prompt.txt)"'
+            )
 
         logger.info(f"Step '{current_step}' starting (budget: {remaining_timeout}s)...")
         copilot_output, timed_out, runtime = exec_run_with_timeout(
@@ -186,7 +252,12 @@ def _run_multi_step(
         )
         total_runtime += runtime
         logger.info(f"Step '{current_step}' runtime: {runtime:.2f}s, timed_out: {timed_out}")
-        logger.info(f"Step '{current_step}' output:\n{copilot_output[-2000:]}")
+        step_label = f"step_{step_count}_{current_step}"
+        step_count += 1
+        if log_dir:
+            _save_copilot_output(log_dir, copilot_output, step_label, logger)
+        else:
+            logger.info(f"Step '{current_step}' output:\n{copilot_output}")
         all_output.append(f"=== Step: {current_step} ===\n{copilot_output}")
 
         if timed_out:
@@ -274,7 +345,7 @@ def run_instance_prediction(
         )
         if timed_out:
             raise RuntimeError("Copilot CLI installation timed out")
-        logger.info(f"Copilot CLI install output:\n{install_output[-500:]}")
+        logger.info(f"Copilot CLI install output:\n{install_output}")
 
         # Find the copilot binary
         which_result = container.exec_run(
@@ -314,7 +385,7 @@ def run_instance_prediction(
             copilot_output = _run_multi_step(
                 variant, container, copilot_path, model_name,
                 extra_flags, env_prefix, problem_statement,
-                timeout, logger,
+                timeout, logger, log_dir,
             )
         else:
             # ── Single-prompt (backward compatible) ──
@@ -326,12 +397,13 @@ def run_instance_prediction(
                 container,
                 ["/bin/bash", "-c",
                  f'{env_prefix}'
-                 f'{copilot_path} --model {model_name} --yolo{extra_flags} '
+                 f'{copilot_path} --model {model_name} --yolo{extra_flags}'
+                 f'{COPILOT_JSON_FLAG} '
                  f'-p "$(cat /tmp/prompt.txt)"'],
                 timeout=timeout,
             )
             logger.info(f"Copilot runtime: {runtime:.2f}s, timed_out: {timed_out}")
-            logger.info(f"Copilot output:\n{copilot_output[-2000:]}")
+            _save_copilot_output(log_dir, copilot_output, "single", logger)
 
             if timed_out:
                 logger.warning(f"Copilot timed out for {instance_id}")
