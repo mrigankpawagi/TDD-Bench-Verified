@@ -65,8 +65,11 @@ def _parse_jsonl_to_text(jsonl_output: str) -> str:
         if event.get("ephemeral"):
             continue
 
-        lines.append(f"\n--- {event.get('type', 'unknown')} ---")
-        _flatten_event(event, lines, indent=0)
+        try:
+            lines.append(f"\n--- {event.get('type', 'unknown')} ---")
+            _flatten_event(event, lines, indent=0)
+        except Exception:
+            lines.append(f"[parse error] {raw_line[:500]}")
 
     return "\n".join(lines)
 
@@ -101,12 +104,16 @@ def _flatten_event(obj, lines: list[str], indent: int, prefix: str = "") -> None
 
 def _save_copilot_output(log_dir: Path, copilot_output: str, label: str, logger) -> None:
     """Save raw JSONL and parsed text log for a copilot invocation."""
-    jsonl_path = log_dir / f"copilot_output_{label}.jsonl"
-    jsonl_path.write_text(copilot_output)
-    logger.info(f"Raw JSONL saved to {jsonl_path}")
+    try:
+        jsonl_path = log_dir / f"copilot_output_{label}.jsonl"
+        jsonl_path.write_text(copilot_output)
+        logger.info(f"Raw JSONL saved to {jsonl_path}")
 
-    parsed = _parse_jsonl_to_text(copilot_output)
-    logger.info(f"Copilot output ({label}):\n{parsed}")
+        parsed = _parse_jsonl_to_text(copilot_output)
+        logger.info(f"Copilot output ({label}):\n{parsed}")
+    except Exception as e:
+        logger.warning(f"Failed to save/parse copilot output ({label}): {e}")
+        logger.info(f"Raw output ({label}):\n{copilot_output}")
 
 
 def load_variant(variant_path: str) -> dict:
