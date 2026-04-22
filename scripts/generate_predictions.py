@@ -426,6 +426,7 @@ def main():
     print(f"Remaining: {len(remaining)}")
     print(f"Output: {output_path}")
     print(f"Variant: {variant_name} (model: {variant['model_name']})")
+    print(f"Token: {gh_token[:4]}...{gh_token[-4:]}")
 
     if not remaining:
         print("All instances already completed.")
