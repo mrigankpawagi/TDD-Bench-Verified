@@ -102,6 +102,58 @@ class TestParseStatus:
         output = "```\nTest results:\n  2 passed\n```\nSTATUS: TEST_FAILS\n"
         assert gp._parse_status(output, self.VALID) == "TEST_FAILS"
 
+    # ── JSONL-format tests (real copilot --output-format json) ──
+
+    def test_jsonl_status_in_assistant_message(self):
+        """STATUS embedded inside a JSONL assistant.message event."""
+        jsonl = json.dumps({
+            "type": "assistant.message",
+            "data": {"content": "Done exploring.\n\nSTATUS: EXPLORE_DONE"},
+        })
+        assert gp._parse_status(jsonl, self.VALID) == "EXPLORE_DONE"
+
+    def test_jsonl_multiple_messages_returns_last(self):
+        """When multiple assistant.message events, return STATUS from the last."""
+        lines = [
+            json.dumps({"type": "assistant.message",
+                         "data": {"content": "STATUS: EXPLORE_DONE"}}),
+            json.dumps({"type": "tool.execution_complete",
+                         "data": {"toolCallId": "x", "success": True}}),
+            json.dumps({"type": "assistant.message",
+                         "data": {"content": "Rewrote test.\nSTATUS: TEST_FAILS"}}),
+        ]
+        assert gp._parse_status("\n".join(lines), self.VALID) == "TEST_FAILS"
+
+    def test_jsonl_status_not_in_tool_output(self):
+        """STATUS in tool result content should NOT be picked up."""
+        lines = [
+            json.dumps({"type": "tool.execution_complete",
+                         "data": {"result": {"content": "STATUS: EXPLORE_DONE"}}}),
+            json.dumps({"type": "assistant.message",
+                         "data": {"content": "No status here."}}),
+        ]
+        assert gp._parse_status("\n".join(lines), self.VALID) is None
+
+    def test_jsonl_ignores_status_in_user_prompt(self):
+        """STATUS in user.message prompt should be ignored."""
+        lines = [
+            json.dumps({"type": "user.message",
+                         "data": {"content": "End with STATUS: EXPLORE_DONE"}}),
+            json.dumps({"type": "assistant.message",
+                         "data": {"content": "Working on it..."}}),
+        ]
+        assert gp._parse_status("\n".join(lines), self.VALID) is None
+
+    def test_jsonl_with_trailing_metadata_events(self):
+        """STATUS found even with non-message events after."""
+        lines = [
+            json.dumps({"type": "assistant.message",
+                         "data": {"content": "STATUS: TEST_FAILS"}}),
+            json.dumps({"type": "assistant.turn_end", "data": {"turnId": "0"}}),
+            json.dumps({"type": "result", "data": {"exitCode": 0}}),
+        ]
+        assert gp._parse_status("\n".join(lines), self.VALID) == "TEST_FAILS"
+
 
 # ── load_variant ─────────────────────────────────────────────────────────────
 
@@ -303,6 +355,8 @@ class TestParseJsonlToText:
         assert "data.content: Hello" in result
         # id and timestamp should be skipped
         assert "id:" not in result.split("---")[0]  # not in preamble
+        # empty toolRequests list should be omitted
+        assert "toolRequests" not in result
 
     def test_nested_fields_flattened(self):
         jsonl = json.dumps({
@@ -352,6 +406,112 @@ class TestParseJsonlToText:
         assert "--- assistant.message ---" in result
         assert "--- tool.execution_complete ---" in result
         assert "data.content: Exploring..." in result
+
+    def test_noisy_fields_filtered(self):
+        """reasoningOpaque, encryptedContent, toolTelemetry etc. should be omitted."""
+        jsonl = json.dumps({
+            "type": "assistant.message",
+            "data": {
+                "content": "Searching the codebase.",
+                "reasoningOpaque": "qXLK8JK0dnFWbtZZ" * 50,
+                "encryptedContent": "oKBT+WdB1TV89mrK" * 50,
+                "interactionId": "c6755ea1-c934-42fb-85d0-589ac50a471f",
+                "requestId": "92DC:86531:3180E91",
+                "agentMode": "autopilot",
+                "transformedContent": "<dt>2026</dt>\nSearching the codebase.",
+                "supportedNativeDocumentMimeTypes": [],
+            },
+        }) + "\n"
+        result = gp._parse_jsonl_to_text(jsonl)
+        assert "data.content: Searching the codebase." in result
+        assert "reasoningOpaque" not in result
+        assert "encryptedContent" not in result
+        assert "interactionId" not in result
+        assert "requestId" not in result
+        assert "agentMode" not in result
+        assert "transformedContent" not in result
+        assert "supportedNativeDocumentMimeTypes" not in result
+
+    def test_detailed_content_skipped_when_content_present(self):
+        """detailedContent is redundant when content exists."""
+        jsonl = json.dumps({
+            "type": "tool.execution_complete",
+            "data": {"result": {
+                "content": "file1.py\nfile2.py",
+                "detailedContent": "file1.py\nfile2.py",
+            }},
+        }) + "\n"
+        result = gp._parse_jsonl_to_text(jsonl)
+        assert "data.result.content: file1.py" in result
+        assert "detailedContent" not in result
+
+    def test_detailed_content_kept_when_content_absent(self):
+        """detailedContent should be kept when content is missing."""
+        jsonl = json.dumps({
+            "type": "tool.execution_complete",
+            "data": {"result": {
+                "detailedContent": "Detailed only",
+            }},
+        }) + "\n"
+        result = gp._parse_jsonl_to_text(jsonl)
+        assert "detailedContent: Detailed only" in result
+
+    def test_report_intent_events_suppressed(self):
+        """report_intent start + complete events should be omitted."""
+        events = [
+            {"type": "tool.execution_start", "data": {
+                "toolCallId": "call_abc", "toolName": "report_intent",
+                "arguments": {"intent": "Exploring codebase"}}},
+            {"type": "tool.execution_complete", "data": {
+                "toolCallId": "call_abc", "success": True,
+                "result": {"content": "Intent logged"}}},
+            {"type": "tool.execution_start", "data": {
+                "toolCallId": "call_xyz", "toolName": "grep",
+                "arguments": {"pattern": "foo"}}},
+        ]
+        jsonl = "\n".join(json.dumps(e) for e in events)
+        result = gp._parse_jsonl_to_text(jsonl)
+        assert "report_intent" not in result
+        assert "Intent logged" not in result
+        assert "--- tool.execution_start ---" in result
+        assert "grep" in result
+
+    def test_report_intent_in_tool_requests_filtered(self):
+        """report_intent entries inside assistant.message toolRequests should be removed."""
+        jsonl = json.dumps({
+            "type": "assistant.message",
+            "data": {
+                "content": "Looking at files.",
+                "toolRequests": [
+                    {"toolCallId": "call_ri", "name": "report_intent",
+                     "arguments": {"intent": "Exploring"}},
+                    {"toolCallId": "call_gr", "name": "grep",
+                     "arguments": {"pattern": "bug"}},
+                ],
+            },
+        }) + "\n"
+        result = gp._parse_jsonl_to_text(jsonl)
+        assert "report_intent" not in result
+        assert "grep" in result
+
+    def test_tool_telemetry_skipped(self):
+        """toolTelemetry should be omitted from tool completion events."""
+        jsonl = json.dumps({
+            "type": "tool.execution_complete",
+            "data": {
+                "toolCallId": "call_1",
+                "success": True,
+                "result": {"content": "matched 5 files"},
+                "toolTelemetry": {
+                    "properties": {"output_mode": "content"},
+                    "metrics": {"result_length": 164},
+                },
+            },
+        }) + "\n"
+        result = gp._parse_jsonl_to_text(jsonl)
+        assert "matched 5 files" in result
+        assert "toolTelemetry" not in result
+        assert "output_mode" not in result
 
 
 # ── _save_copilot_output ─────────────────────────────────────────────────────

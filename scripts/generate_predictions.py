@@ -50,8 +50,15 @@ def _make_tar(name: str, data: bytes) -> bytes:
 
 
 def _parse_jsonl_to_text(jsonl_output: str) -> str:
-    """Parse Copilot JSONL output into human-readable text, printing every field."""
-    lines = []
+    """Parse Copilot JSONL output into human-readable text.
+
+    Filters out noisy fields (encrypted content, telemetry, etc.) and
+    suppresses ``report_intent`` tool events to keep logs readable.
+    """
+    lines: list[str] = []
+    # Track report_intent toolCallIds so we can suppress their completion events
+    report_intent_ids: set[str] = set()
+
     for raw_line in jsonl_output.strip().split("\n"):
         raw_line = raw_line.strip()
         if not raw_line:
@@ -65,28 +72,73 @@ def _parse_jsonl_to_text(jsonl_output: str) -> str:
         if event.get("ephemeral"):
             continue
 
+        data = event.get("data", {})
+        event_type = event.get("type", "unknown")
+
+        # Suppress report_intent tool events (start + complete)
+        if event_type == "tool.execution_start":
+            tool_name = data.get("toolName", "")
+            if tool_name == "report_intent":
+                tool_call_id = data.get("toolCallId", "")
+                if tool_call_id:
+                    report_intent_ids.add(tool_call_id)
+                continue
+        if event_type == "tool.execution_complete":
+            tool_call_id = data.get("toolCallId", "")
+            if tool_call_id in report_intent_ids:
+                continue
+
+        # Suppress report_intent entries inside assistant.message toolRequests
+        if event_type == "assistant.message" and "toolRequests" in data:
+            data = dict(data)
+            data["toolRequests"] = [
+                tr for tr in data["toolRequests"]
+                if tr.get("name") != "report_intent"
+            ]
+            # Track their IDs for completion suppression
+            for tr in event.get("data", {}).get("toolRequests", []):
+                if tr.get("name") == "report_intent":
+                    tcid = tr.get("toolCallId", "")
+                    if tcid:
+                        report_intent_ids.add(tcid)
+
         try:
-            lines.append(f"\n--- {event.get('type', 'unknown')} ---")
-            _flatten_event(event, lines, indent=0)
+            lines.append(f"\n--- {event_type} ---")
+            _flatten_event(data, lines, indent=0, prefix="data")
         except Exception:
             lines.append(f"[parse error] {raw_line[:500]}")
 
     return "\n".join(lines)
 
 
+# Fields to skip when flattening JSONL events — these are noisy or redundant.
+_SKIP_FIELDS = {
+    "reasoningOpaque", "encryptedContent", "transformedContent",
+    "toolTelemetry", "intentionSummary",
+    "interactionId", "requestId", "agentMode",
+    "supportedNativeDocumentMimeTypes",
+}
+
+
 def _flatten_event(obj, lines: list[str], indent: int, prefix: str = "") -> None:
     """Recursively print all fields of a JSON object with labels."""
     pad = "  " * indent
     if isinstance(obj, dict):
+        # When content is present, skip detailedContent (redundant)
+        has_content = "content" in obj and obj["content"]
         for key, value in obj.items():
             if key in ("id", "parentId", "timestamp", "ephemeral"):
                 continue
-            label = f"{prefix}{key}" if not prefix else f"{prefix}.{key}"
+            if key in _SKIP_FIELDS:
+                continue
+            if key == "detailedContent" and has_content:
+                continue
+            label = f"{prefix}.{key}" if prefix else key
             if isinstance(value, dict):
                 _flatten_event(value, lines, indent, label)
             elif isinstance(value, list):
                 if not value:
-                    lines.append(f"{pad}{label}: []")
+                    continue  # skip empty lists
                 elif all(isinstance(v, (str, int, float, bool)) for v in value):
                     lines.append(f"{pad}{label}: {value}")
                 else:
@@ -95,8 +147,8 @@ def _flatten_event(obj, lines: list[str], indent: int, prefix: str = "") -> None
                         _flatten_event(item, lines, indent + 1)
             else:
                 val_str = str(value)
-                if len(val_str) > 500:
-                    val_str = val_str[:500] + "..."
+                if len(val_str) > 2000:
+                    val_str = val_str[:2000] + "..."
                 lines.append(f"{pad}{label}: {val_str}")
     else:
         lines.append(f"{pad}{prefix}: {obj}")
@@ -153,12 +205,47 @@ def validate_variant(variant: dict) -> None:
 
 
 def _parse_status(output: str, valid_statuses: list[str]) -> str | None:
-    """Parse STATUS: XXX from the last non-empty lines of copilot output."""
+    """Parse STATUS: XXX from copilot output (JSONL or plain text).
+
+    For JSONL output, extracts ``data.content`` from ``assistant.message``
+    events and searches those in reverse order.  Falls back to plain-text
+    line scanning when no JSONL assistant messages are found.
+    """
+    status_re = re.compile(r"^.*STATUS:\s*([A-Z0-9_]+)\s*$")
+
+    # Try JSONL: collect assistant message contents in order
+    assistant_contents: list[str] = []
+    for raw_line in output.strip().split("\n"):
+        raw_line = raw_line.strip()
+        if not raw_line:
+            continue
+        try:
+            event = json.loads(raw_line)
+            if event.get("type") == "assistant.message":
+                content = event.get("data", {}).get("content", "")
+                if content:
+                    assistant_contents.append(content)
+        except json.JSONDecodeError:
+            continue
+
+    if assistant_contents:
+        # Search assistant messages newest-first
+        for content in reversed(assistant_contents):
+            for line in reversed(content.strip().split("\n")):
+                line = line.strip()
+                if not line:
+                    continue
+                m = status_re.match(line)
+                if m and m.group(1) in valid_statuses:
+                    return m.group(1)
+        return None
+
+    # Fallback: plain-text output (e.g. in tests or non-JSON mode)
     for line in reversed(output.strip().split("\n")):
         line = line.strip()
         if not line:
             continue
-        m = re.match(r"^.*STATUS:\s*([A-Z0-9_]+)\s*$", line)
+        m = status_re.match(line)
         if m and m.group(1) in valid_statuses:
             return m.group(1)
     return None
