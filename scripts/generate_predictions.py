@@ -63,38 +63,44 @@ def _parse_jsonl_to_text(jsonl_output: str) -> str:
             continue
 
         event_type = event.get("type", "")
-        if event_type == "response":
-            body = event.get("body", "")
-            if body:
-                lines.append(body)
-        elif event_type == "tool_call":
-            name = event.get("tool", event.get("name", "unknown"))
-            args = event.get("arguments", event.get("args", {}))
-            if isinstance(args, dict):
-                args_str = json.dumps(args, indent=2)
-            else:
-                args_str = str(args)
-            lines.append(f"\n>>> Tool call: {name}")
-            lines.append(args_str)
-        elif event_type == "tool_result":
-            name = event.get("tool", event.get("name", ""))
-            result = event.get("result", event.get("output", ""))
-            if isinstance(result, dict):
-                result_str = json.dumps(result, indent=2)
-            else:
-                result_str = str(result)
-            header = f"<<< Tool result: {name}" if name else "<<< Tool result"
+        data = event.get("data", {})
+
+        if event_type == "assistant.message":
+            content = data.get("content", "")
+            if content:
+                lines.append(content)
+            for req in data.get("toolRequests", []):
+                name = req.get("name", "unknown")
+                args = req.get("arguments", {})
+                args_str = json.dumps(args, indent=2) if isinstance(args, dict) else str(args)
+                lines.append(f"\n>>> Tool call: {name}")
+                lines.append(args_str)
+        elif event_type == "tool.execution_complete":
+            name = data.get("toolName", data.get("name", ""))
+            success = data.get("success", None)
+            result = data.get("result", {})
+            content = result.get("content", "") if isinstance(result, dict) else str(result)
+            status = "✓" if success else "✗"
+            header = f"<<< Tool result ({status}): {name}" if name else f"<<< Tool result ({status})"
             lines.append(header)
-            lines.append(result_str)
+            if content:
+                lines.append(str(content))
+        elif event_type == "tool.execution_start":
+            pass  # Already shown via toolRequests in assistant.message
+        elif event_type == "assistant.message_delta":
+            pass  # Streaming deltas — full message comes in assistant.message
+        elif event_type == "result":
+            usage = data.get("usage", {})
+            if usage:
+                lines.append(
+                    f"\n[RESULT] Premium requests: {usage.get('premiumRequests', '?')}, "
+                    f"API duration: {usage.get('totalApiDurationMs', '?')}ms, "
+                    f"Changes: +{usage.get('codeChanges', {}).get('linesAdded', 0)} "
+                    f"-{usage.get('codeChanges', {}).get('linesRemoved', 0)}"
+                )
         elif event_type == "error":
-            lines.append(f"[ERROR] {event.get('message', event.get('body', ''))}")
-        elif event_type == "status":
-            lines.append(f"[STATUS] {event.get('body', event.get('message', ''))}")
-        else:
-            # Unknown event type — include raw for debugging
-            body = event.get("body", event.get("message", ""))
-            if body:
-                lines.append(str(body))
+            lines.append(f"[ERROR] {data.get('message', data.get('body', ''))}")
+        # Skip ephemeral session events (mcp_server_status_changed, skills_loaded, etc.)
 
     return "\n".join(lines)
 
