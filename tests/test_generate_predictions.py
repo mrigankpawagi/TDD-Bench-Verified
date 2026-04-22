@@ -291,66 +291,48 @@ class TestResultIO:
 
 
 class TestParseJsonlToText:
-    def test_assistant_message(self):
-        jsonl = '{"type": "assistant.message", "data": {"content": "Hello world", "toolRequests": []}}\n'
-        result = gp._parse_jsonl_to_text(jsonl)
-        assert "Hello world" in result
-
-    def test_tool_call_in_assistant_message(self):
+    def test_prints_all_fields(self):
         jsonl = json.dumps({
             "type": "assistant.message",
-            "data": {
-                "content": "",
-                "toolRequests": [
-                    {"name": "shell", "arguments": {"command": "ls"}, "type": "function"}
-                ],
-            },
+            "data": {"content": "Hello", "toolRequests": []},
+            "id": "abc",
+            "timestamp": "2026-01-01",
         }) + "\n"
         result = gp._parse_jsonl_to_text(jsonl)
-        assert ">>> Tool call: shell" in result
-        assert '"command"' in result
+        assert "--- assistant.message ---" in result
+        assert "data.content: Hello" in result
+        # id and timestamp should be skipped
+        assert "id:" not in result.split("---")[0]  # not in preamble
 
-    def test_tool_execution_complete(self):
+    def test_nested_fields_flattened(self):
         jsonl = json.dumps({
             "type": "tool.execution_complete",
-            "data": {
-                "toolName": "shell",
-                "success": True,
-                "result": {"content": "file1.py\nfile2.py"},
-            },
+            "data": {"toolName": "shell", "success": True,
+                     "result": {"content": "file1.py"}},
         }) + "\n"
         result = gp._parse_jsonl_to_text(jsonl)
-        assert "<<< Tool result (✓): shell" in result
-        assert "file1.py" in result
+        assert "data.toolName: shell" in result
+        assert "data.success: True" in result
+        assert "data.result.content: file1.py" in result
 
-    def test_tool_execution_failure(self):
+    def test_list_fields(self):
         jsonl = json.dumps({
-            "type": "tool.execution_complete",
-            "data": {"toolName": "shell", "success": False, "result": {"content": "error"}},
+            "type": "assistant.message",
+            "data": {"content": "", "toolRequests": [
+                {"name": "shell", "arguments": {"command": "ls"}}
+            ]},
         }) + "\n"
         result = gp._parse_jsonl_to_text(jsonl)
-        assert "(✗)" in result
+        assert "data.toolRequests[0]:" in result
+        assert "name: shell" in result
 
-    def test_error_events(self):
-        jsonl = '{"type": "error", "data": {"message": "Rate limited"}}\n'
-        result = gp._parse_jsonl_to_text(jsonl)
-        assert "[ERROR]" in result
-        assert "Rate limited" in result
-
-    def test_result_event_with_usage(self):
+    def test_ephemeral_events_skipped(self):
         jsonl = json.dumps({
-            "type": "result",
-            "data": {"usage": {"premiumRequests": 5, "totalApiDurationMs": 1234,
-                               "codeChanges": {"linesAdded": 10, "linesRemoved": 3}}},
+            "type": "session.mcp_server_status_changed",
+            "data": {}, "ephemeral": True,
         }) + "\n"
         result = gp._parse_jsonl_to_text(jsonl)
-        assert "[RESULT]" in result
-        assert "1234ms" in result
-
-    def test_streaming_deltas_skipped(self):
-        jsonl = '{"type": "assistant.message_delta", "data": {"deltaContent": "partial"}}\n'
-        result = gp._parse_jsonl_to_text(jsonl)
-        assert "partial" not in result
+        assert result.strip() == ""
 
     def test_non_json_lines_preserved(self):
         result = gp._parse_jsonl_to_text("plain text output\n")
@@ -359,29 +341,17 @@ class TestParseJsonlToText:
     def test_empty_input(self):
         assert gp._parse_jsonl_to_text("") == ""
 
-    def test_mixed_events(self):
+    def test_multiple_events(self):
         events = [
-            {"type": "assistant.message", "data": {"content": "Exploring...", "toolRequests": []}},
-            {"type": "assistant.message", "data": {"content": "", "toolRequests": [
-                {"name": "shell", "arguments": {"command": "find . -name test*"}, "type": "function"}
-            ]}},
-            {"type": "tool.execution_complete", "data": {
-                "toolName": "shell", "success": True,
-                "result": {"content": "tests/test_foo.py"},
-            }},
-            {"type": "assistant.message", "data": {"content": "Found tests.", "toolRequests": []}},
+            {"type": "assistant.message", "data": {"content": "Exploring..."}},
+            {"type": "tool.execution_complete", "data": {"toolName": "shell",
+             "result": {"content": "ok"}}},
         ]
         jsonl = "\n".join(json.dumps(e) for e in events)
         result = gp._parse_jsonl_to_text(jsonl)
-        assert "Exploring..." in result
-        assert ">>> Tool call: shell" in result
-        assert "<<< Tool result (✓): shell" in result
-        assert "Found tests." in result
-
-    def test_ephemeral_session_events_skipped(self):
-        jsonl = '{"type": "session.mcp_server_status_changed", "data": {}, "ephemeral": true}\n'
-        result = gp._parse_jsonl_to_text(jsonl)
-        assert result == ""
+        assert "--- assistant.message ---" in result
+        assert "--- tool.execution_complete ---" in result
+        assert "data.content: Exploring..." in result
 
 
 # ── _save_copilot_output ─────────────────────────────────────────────────────
@@ -398,9 +368,8 @@ class TestSaveCopilotOutput:
 
     def test_logs_parsed_text(self, tmp_path):
         logger = MagicMock()
-        jsonl = '{"type": "assistant.message", "data": {"content": "Done", "toolRequests": []}}\n'
+        jsonl = '{"type": "assistant.message", "data": {"content": "Done"}}\n'
         gp._save_copilot_output(tmp_path, jsonl, "single", logger)
-        # Should log twice: once for JSONL path, once for parsed output
         assert logger.info.call_count == 2
         parsed_log = logger.info.call_args_list[1][0][0]
         assert "Done" in parsed_log

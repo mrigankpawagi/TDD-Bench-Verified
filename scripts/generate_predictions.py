@@ -50,7 +50,7 @@ def _make_tar(name: str, data: bytes) -> bytes:
 
 
 def _parse_jsonl_to_text(jsonl_output: str) -> str:
-    """Parse Copilot JSONL output into human-readable text with expanded tool calls."""
+    """Parse Copilot JSONL output into human-readable text, printing every field."""
     lines = []
     for raw_line in jsonl_output.strip().split("\n"):
         raw_line = raw_line.strip()
@@ -62,47 +62,41 @@ def _parse_jsonl_to_text(jsonl_output: str) -> str:
             lines.append(raw_line)
             continue
 
-        event_type = event.get("type", "")
-        data = event.get("data", {})
+        if event.get("ephemeral"):
+            continue
 
-        if event_type == "assistant.message":
-            content = data.get("content", "")
-            if content:
-                lines.append(content)
-            for req in data.get("toolRequests", []):
-                name = req.get("name", "unknown")
-                args = req.get("arguments", {})
-                args_str = json.dumps(args, indent=2) if isinstance(args, dict) else str(args)
-                lines.append(f"\n>>> Tool call: {name}")
-                lines.append(args_str)
-        elif event_type == "tool.execution_complete":
-            name = data.get("toolName", data.get("name", ""))
-            success = data.get("success", None)
-            result = data.get("result", {})
-            content = result.get("content", "") if isinstance(result, dict) else str(result)
-            status = "✓" if success else "✗"
-            header = f"<<< Tool result ({status}): {name}" if name else f"<<< Tool result ({status})"
-            lines.append(header)
-            if content:
-                lines.append(str(content))
-        elif event_type == "tool.execution_start":
-            pass  # Already shown via toolRequests in assistant.message
-        elif event_type == "assistant.message_delta":
-            pass  # Streaming deltas — full message comes in assistant.message
-        elif event_type == "result":
-            usage = data.get("usage", {})
-            if usage:
-                lines.append(
-                    f"\n[RESULT] Premium requests: {usage.get('premiumRequests', '?')}, "
-                    f"API duration: {usage.get('totalApiDurationMs', '?')}ms, "
-                    f"Changes: +{usage.get('codeChanges', {}).get('linesAdded', 0)} "
-                    f"-{usage.get('codeChanges', {}).get('linesRemoved', 0)}"
-                )
-        elif event_type == "error":
-            lines.append(f"[ERROR] {data.get('message', data.get('body', ''))}")
-        # Skip ephemeral session events (mcp_server_status_changed, skills_loaded, etc.)
+        lines.append(f"\n--- {event.get('type', 'unknown')} ---")
+        _flatten_event(event, lines, indent=0)
 
     return "\n".join(lines)
+
+
+def _flatten_event(obj, lines: list[str], indent: int, prefix: str = "") -> None:
+    """Recursively print all fields of a JSON object with labels."""
+    pad = "  " * indent
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if key in ("id", "parentId", "timestamp", "ephemeral"):
+                continue
+            label = f"{prefix}{key}" if not prefix else f"{prefix}.{key}"
+            if isinstance(value, dict):
+                _flatten_event(value, lines, indent, label)
+            elif isinstance(value, list):
+                if not value:
+                    lines.append(f"{pad}{label}: []")
+                elif all(isinstance(v, (str, int, float, bool)) for v in value):
+                    lines.append(f"{pad}{label}: {value}")
+                else:
+                    for i, item in enumerate(value):
+                        lines.append(f"{pad}{label}[{i}]:")
+                        _flatten_event(item, lines, indent + 1)
+            else:
+                val_str = str(value)
+                if len(val_str) > 500:
+                    val_str = val_str[:500] + "..."
+                lines.append(f"{pad}{label}: {val_str}")
+    else:
+        lines.append(f"{pad}{prefix}: {obj}")
 
 
 def _save_copilot_output(log_dir: Path, copilot_output: str, label: str, logger) -> None:
