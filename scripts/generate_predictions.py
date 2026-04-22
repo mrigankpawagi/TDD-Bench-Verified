@@ -146,10 +146,7 @@ def _flatten_event(obj, lines: list[str], indent: int, prefix: str = "") -> None
                         lines.append(f"{pad}{label}[{i}]:")
                         _flatten_event(item, lines, indent + 1)
             else:
-                val_str = str(value)
-                if len(val_str) > 2000:
-                    val_str = val_str[:2000] + "..."
-                lines.append(f"{pad}{label}: {val_str}")
+                lines.append(f"{pad}{label}: {value}")
     else:
         lines.append(f"{pad}{prefix}: {obj}")
 
