@@ -1,56 +1,6 @@
 [
   {
-    "instance_id": "scikit-learn__scikit-learn-13328",
-    "model_patch": "diff --git a/sklearn/linear_model/tests/test_huber.py b/sklearn/linear_model/tests/test_huber.py\nindex 6a8b26133d..99d6e152fa 100644\n--- a/sklearn/linear_model/tests/test_huber.py\n+++ b/sklearn/linear_model/tests/test_huber.py\n@@ -199,3 +199,13 @@ def test_huber_better_r2_score():\n \n     # The huber model should also fit poorly on the outliers.\n     assert_greater(ridge_outlier_score, huber_outlier_score)\n+\n+\n+def test_huber_bool_X_raises_typeerror():\n+    # Reproducer: boolean X used to raise TypeError in HuberRegressor.fit\n+    X, y = make_regression(n_samples=200, n_features=2, noise=4.0, coef=False,\n+                           random_state=0)\n+    X_bool = X > 0\n+    # Historically this raised TypeError when X was boolean. Expect TypeError.\n+    with pytest.raises(TypeError):\n+        HuberRegressor().fit(X_bool, y)",
-    "model_name_or_path": "gpt-5-mini"
-  },
-  {
-    "instance_id": "sphinx-doc__sphinx-9673",
-    "model_patch": "diff --git a/tests/roots/test-ext-autodoc/target/napoleon_google.py b/tests/roots/test-ext-autodoc/target/napoleon_google.py\nnew file mode 100644\nindex 000000000..6d2b16a4f\n--- /dev/null\n+++ b/tests/roots/test-ext-autodoc/target/napoleon_google.py\n@@ -0,0 +1,8 @@\n+def func(x: int) -> str:\n+    \"\"\"Description.\n+\n+    Returns:\n+        The returned value.\n+\n+    \"\"\"\n+    return str(x)\ndiff --git a/tests/test_ext_autodoc_napoleon.py b/tests/test_ext_autodoc_napoleon.py\nnew file mode 100644\nindex 000000000..fdcd07632\n--- /dev/null\n+++ b/tests/test_ext_autodoc_napoleon.py\n@@ -0,0 +1,14 @@\n+import pytest\n+\n+\n+@pytest.mark.sphinx('text', testroot='ext-autodoc',\n+                    confoverrides={'autodoc_typehints': 'description',\n+                                   'autodoc_typehints_description_target': 'documented',\n+                                   'extensions': ['sphinx.ext.autodoc', 'sphinx.ext.napoleon']})\n+def test_autodoc_typehints_with_napoleon_documented(app):\n+    # use an index that documents the napoleon-style docstring function\n+    (app.srcdir / 'index.rst').write_text('.. autofunction:: target.napoleon_google.func\\n')\n+    app.build()\n+    context = (app.outdir / 'index.txt').read_text()\n+    # Expectation: return type should be present when using napoleon\n+    assert ('Return type:' in context) and ('str' in context)",
-    "model_name_or_path": "gpt-5-mini"
-  },
-  {
     "instance_id": "django__django-11880",
-    "model_patch": "",
-    "model_name_or_path": "gpt-5-mini"
-  },
-  {
-    "instance_id": "astropy__astropy-14598",
-    "model_patch": "",
-    "model_name_or_path": "gpt-5-mini"
-  },
-  {
-    "instance_id": "django__django-14376",
-    "model_patch": "",
-    "model_name_or_path": "gpt-5-mini"
-  },
-  {
-    "instance_id": "django__django-13964",
-    "model_patch": "",
-    "model_name_or_path": "gpt-5-mini"
-  },
-  {
-    "instance_id": "django__django-13658",
-    "model_patch": "",
-    "model_name_or_path": "gpt-5-mini"
-  },
-  {
-    "instance_id": "django__django-12276",
-    "model_patch": "",
-    "model_name_or_path": "gpt-5-mini"
-  },
-  {
-    "instance_id": "sphinx-doc__sphinx-9602",
-    "model_patch": "",
-    "model_name_or_path": "gpt-5-mini"
-  },
-  {
-    "instance_id": "django__django-11749",
-    "model_patch": "",
-    "model_name_or_path": "gpt-5-mini"
-  },
-  {
-    "instance_id": "sphinx-doc__sphinx-10673",
     "model_patch": "",
     "model_name_or_path": "gpt-5-mini"
   }
