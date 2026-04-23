@@ -1,5 +1,4 @@
 model_name: gpt-5-mini
-autopilot: true
 max_retries: 3
 
 steps:
@@ -11,7 +10,9 @@ steps:
 
       Explore the existing tests in the codebase that touch the relevant code.
       Understand how tests are structured, how they set up the context, and how
-      they are run (e.g. test framework, test runner script).
+      they are run (e.g. test framework like `pytest` or `tox`, test runner
+      script like `**/runtests.py`, etc.). You should not be installing any new
+      dependencies or using any new ways of running tests.
 
       You may also try to run a test to ensure you understand how to run tests
       in this codebase.
@@ -73,7 +74,8 @@ steps:
   - name: verify
     prompt: |
       Now verify your test is correct:
-      1. Patch the source code to fix the bug.
+      1. Patch (ONLY) the source code to fix the bug. DO NOT change any test
+         code in this step.
       2. Run the test — it should now PASS.
       3. Revert the patch: git checkout -- .
       4. Run the test again — it should FAIL.
