@@ -15,7 +15,7 @@ steps:
       dependencies or using any new ways of running tests.
 
       You may also try to run a test to ensure you understand how to run tests
-      in this codebase.
+      in this codebase and identify the exact test command.
 
       When done, end your response with exactly:
       STATUS: EXPLORE_DONE
@@ -73,26 +73,40 @@ steps:
 
   - name: verify
     prompt: |
-      Now verify your test is correct:
-      1. Patch (ONLY) the source code to fix the bug. DO NOT change any test
-         code in this step.
-      2. Run the test — it should now PASS.
-      3. Revert the patch: git checkout -- .
-      4. Run the test again — it should FAIL.
+      Now verify your test is correct by patching (ONLY) the source code to fix
+      the bug, and then running the test again.
+
+      **DO NOT** change any test code in this step. Simply write the patch and
+      run the test.
 
       When done, end your response with exactly one of:
-      - STATUS: VERIFIED       (test passes after patch, fails after revert)
+      - STATUS: VERIFIED       (test passes after patching)
       - STATUS: PATCH_FAILED   (could not figure out the fix)
-      - STATUS: TEST_WRONG     (test does not pass even after patching)
+      - STATUS: TEST_WRONG     (test does not pass after patching)
     transitions:
       VERIFIED:
-        goto: done
+        goto: cleanup
       PATCH_FAILED:
         goto: done
       TEST_WRONG:
         goto: write_test
         instruction: >
           The test still fails even after patching the code to fix the bug.
-          This means the test assertions are wrong. Go back, analyze what the
+          This means the test assertions are wrong. Revert the patch you made
+          to the source code to fix the bug, then go back, analyze what the
           correct behavior should be after the fix, and rewrite the test with
           correct assertions.
+  
+  - name: cleanup
+    prompt: |
+      Great! You have successfully written a test that reproduces the bug and
+      verified that it fails due to the bug and passes after the fix.
+
+      Now please revert any changes you made to the source code. We only want
+      the reproduction test, not the fix.
+
+      When done, end your response with exactly:
+      STATUS: DONE
+    transitions:
+      DONE:
+        goto: done
